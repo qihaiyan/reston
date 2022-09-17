@@ -1,0 +1,29 @@
+[package]
+name = "orient"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+#[features]
+#default = ["glow", "http"]
+
+#http = ["ehttp"]
+
+#syntax_highlighting = ["lib/syntax_highlighting"]
+
+#glow = ["eframe/glow"]
+
+[dependencies]
+eframe = { version = "0.19.0"}
+egui = "0.19.0" 
+tracing = "0.1"
+glow = { version = "0.11", optional = true }
+egui_extras = "0.19.0"
+
+# feature "http":
+ehttp = "0.2.0"
+poll-promise = "0.1"
+
+# native:
+#[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+#tracing-subscriber = "0.3"
