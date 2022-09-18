@@ -1,13 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::collections::BTreeMap;
+
 use eframe::egui;
-use egui::{Button, CollapsingHeader, Label, Slider, ScrollArea};
+use egui::{
+    style::Margin, text::LayoutJob, Align, Button, CentralPanel, CollapsingHeader, Color32, FontId,
+    Frame, Label, ScrollArea, SidePanel, Slider, TextFormat, TextStyle, TopBottomPanel, Ui,
+    WidgetText, Window,
+};
+use egui_dock::{
+    DockArea, DynamicTabViewer, DynamicTree, NodeIndex, Style, Tab, TabBuilder, TabViewer, Tree,
+};
 use poll_promise::Promise;
 
 fn main() {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "✨ Orient",
+        "Orient",
         options,
         Box::new(|_cc| Box::new(HttpApp::default())),
     );
@@ -39,12 +48,152 @@ impl Resource {
     }
 }
 
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+enum Method {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Head,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ScrollDemo {
+    ScrollTo,
+    ManyLines,
+    LargeCanvas,
+}
+
+impl Default for ScrollDemo {
+    fn default() -> Self {
+        Self::ScrollTo
+    }
+}
+
+// #[derive(Debug, PartialEq)]
+// struct Location {
+//     name: String,
+//     url: String,
+// }
+
+// impl Location {
+//     pub fn new(name: String, url: String) -> Self {
+//         Self { name, url }
+//     }
+// }
+
+// impl Default for Location {
+//     fn default() -> Self {
+//         Self {
+//             url: "".into(),
+//             name: "".into(),
+//         }
+//     }
+// }
+
+struct MyContext {
+    buffers: BTreeMap<String, String>,
+    name: String,
+    // url: String,
+    method: Method,
+    demo: ScrollDemo,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    promise: Option<Promise<ehttp::Result<Resource>>>,
+}
+
+impl MyContext {
+    pub fn new(name: String, buffers: BTreeMap<String, String>) -> Self {
+        Self {
+            buffers,
+            name,
+            // url,
+            method: Method::Get,
+            demo: ScrollDemo::ScrollTo,
+            promise: Default::default(),
+        }
+    }
+}
+
+impl TabViewer for MyContext {
+    type Tab = String;
+
+    fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
+        Frame::none()
+            .inner_margin(Margin::same(2.0))
+            .show(ui, |ui| {
+                let mut url = self.buffers.get(tab).unwrap().clone().into();
+                let trigger_fetch = ui_url(ui, &mut self.method, &mut url);
+
+                if trigger_fetch {
+                    let ctx = ui.ctx().clone();
+                    let (sender, promise) = Promise::new();
+                    let request = ehttp::Request::get(&url);
+                    ehttp::fetch(request, move |response| {
+                        ctx.request_repaint(); // wake up UI thread
+                        let resource =
+                            response.map(|response| Resource::from_response(&ctx, response));
+                        sender.send(resource);
+                    });
+                    self.promise = Some(promise);
+                }
+
+                ui.horizontal(|ui| {
+                    ui.selectable_value(&mut self.demo, ScrollDemo::ScrollTo, "Parameters");
+                    ui.selectable_value(&mut self.demo, ScrollDemo::ManyLines, "Body");
+                    ui.selectable_value(&mut self.demo, ScrollDemo::LargeCanvas, "Headers");
+                });
+
+                match self.demo {
+                    ScrollDemo::ScrollTo => {
+                        // self.scroll_to.ui(ui);
+                    }
+                    ScrollDemo::ManyLines => {
+                        huge_content_lines(ui);
+                    }
+                    ScrollDemo::LargeCanvas => {
+                        huge_content_lines(ui);
+                    }
+                }
+
+                if let Some(promise) = &self.promise {
+                    if let Some(result) = promise.ready() {
+                        match result {
+                            Ok(resource) => {
+                                ui_resource(ui, resource);
+                            }
+                            Err(error) => {
+                                // This should only happen if the fetch API isn't available or something similar.
+                                ui.colored_label(
+                                    ui.visuals().error_fg_color,
+                                    if error.is_empty() { "Error" } else { error },
+                                );
+                            }
+                        }
+                    } else {
+                        ui.spinner();
+                    }
+                }
+            });
+    }
+
+    fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
+        egui::WidgetText::from(&*tab)
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct HttpApp {
-    url: String,
-    items: Vec<Vec<String>>,
+    // url: String,
+    // items: Vec<MyContext>,
     cats: Vec<String>,
     search: String,
+    method: Method,
+    demo: ScrollDemo,
+    tree: egui_dock::Tree<String>,
+    context: MyContext,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     promise: Option<Promise<ehttp::Result<Resource>>>,
@@ -52,42 +201,54 @@ pub struct HttpApp {
 
 impl Default for HttpApp {
     fn default() -> Self {
+        let mut buffers: BTreeMap<String, String> = BTreeMap::default();
+        buffers.insert("Item get".into(), "https://httpbin.org/get".into());
+        buffers.insert(
+            "Item anything".into(),
+            "https://httpbin.org/anything".into(),
+        );
+        buffers.insert("Item F".into(), "Item G".into());
+        let context = MyContext::new("Simple Demo".to_owned(), buffers);
+
+        // let mut tree = Tree::new(vec!["Simple Demo".to_owned()]);
         Self {
-            url: "https://httpbin.org/get".to_owned(),
-            items: vec![
-                vec!["Item get", "https://httpbin.org/get"],
-                vec!["Item anything", "https://httpbin.org/anything"],
-                vec!["Item F", "Item G"],
-            ]
-            .into_iter()
-            .map(|v| v.into_iter().map(ToString::to_string).collect())
-            .collect(),
+            // url: "https://httpbin.org/get".to_owned(),
+            // items: vec![
+            //     MyContext::new("Item get".into(), "https://httpbin.org/get".into()),
+            //     MyContext::new(
+            //         "Item anything".into(),
+            //         "https://httpbin.org/anything".into(),
+            //     ),
+            //     MyContext::new("Item F".into(), "Item G".into()),
+            // ],
             promise: Default::default(),
             search: "".to_owned(),
             cats: vec!["Widgets 1".to_owned(), "Widgets 2".to_owned()],
+            method: Method::Get,
+            demo: ScrollDemo::ScrollTo,
+            tree: Default::default(),
+            context,
         }
     }
 }
 
 impl eframe::App for HttpApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::bottom("http_bottom")
-            .resizable(true)
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        TopBottomPanel::bottom("http_bottom")
+            .resizable(false)
             .show(ctx, |ui| {
                 let layout = egui::Layout::top_down(egui::Align::Center).with_main_justify(true);
                 ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
                     ui.add(egui::Hyperlink::from_label_and_url(
-                        egui::RichText::new("Context::set_fonts")
-                            .text_style(egui::TextStyle::Monospace),
-                        "https://docs.rs/egui/latest/egui/struct.Context.html#method.set_fonts",
+                        egui::RichText::new("Feedback").text_style(egui::TextStyle::Monospace),
+                        "https://github.com/qihaiyan/orient",
                     ));
                 });
             });
 
-        egui::SidePanel::left("left_panel")
+        SidePanel::left("left_panel")
             .resizable(true)
             .show(ctx, |ui| {
-
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("search:");
@@ -105,55 +266,93 @@ impl eframe::App for HttpApp {
                         CollapsingHeader::new(cat)
                             .default_open(true)
                             .show(ui, |ui| {
-                                for (col_idx, item) in self.items.clone().into_iter().enumerate() {
-                                    if ui.button(item.get(0).unwrap()).clicked() {
-                                        self.url = item.get(1).unwrap().to_string();
+                                for (name, _url) in &self.context.buffers {
+                                    let tab_location = self.tree.find_tab(name);
+                                    let is_open = tab_location.is_some();
+                                    if ui.selectable_label(is_open, name.clone()).clicked() {
+                                        if let Some((node_index, tab_index)) = tab_location {
+                                            self.tree.set_active_tab(node_index, tab_index);
+                                        } else {
+                                            self.tree.push_to_focused_leaf(name.clone());
+                                        }
                                     }
+                                    // if ui
+                                    //     .selectable_label(false, item.get(0).unwrap().to_string())
+                                    //     .clicked()
+                                    // {
+                                    //     self.url = item.get(1).unwrap().to_string();
+                                    // }
+                                    // if ui.button(item.get(0).unwrap()).clicked() {
+                                    //     self.url = item.get(1).unwrap().to_string();
+                                    // }
                                 }
                             });
                     }
                 });
             });
 
-        egui::TopBottomPanel::top("http_top")
-            .resizable(true)
-            .show(ctx, |ui| {
-                let trigger_fetch = ui_url(ui, frame, &mut self.url);
+        DockArea::new(&mut self.tree)
+            // .style(style)
+            .show(ctx, &mut self.context);
+        // DockArea::new(&mut self.tree).show(ctx, &mut DynamicTabViewer {});
 
-                if trigger_fetch {
-                    let ctx = ctx.clone();
-                    let (sender, promise) = Promise::new();
-                    let request = ehttp::Request::get(&self.url);
-                    ehttp::fetch(request, move |response| {
-                        ctx.request_repaint(); // wake up UI thread
-                        let resource =
-                            response.map(|response| Resource::from_response(&ctx, response));
-                        sender.send(resource);
-                    });
-                    self.promise = Some(promise);
-                }
-            });
+        // TopBottomPanel::top("http_top")
+        //     // .frame(Frame::none().inner_margin(Margin::same(2.0)))
+        //     .show(ctx, |ui| {
+        //         let trigger_fetch = ui_url(ui, &mut self.method, &mut self.url);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            if let Some(promise) = &self.promise {
-                if let Some(result) = promise.ready() {
-                    match result {
-                        Ok(resource) => {
-                            ui_resource(ui, resource);
-                        }
-                        Err(error) => {
-                            // This should only happen if the fetch API isn't available or something similar.
-                            ui.colored_label(
-                                ui.visuals().error_fg_color,
-                                if error.is_empty() { "Error" } else { error },
-                            );
-                        }
-                    }
-                } else {
-                    ui.spinner();
-                }
-            }
-        });
+        //         if trigger_fetch {
+        //             let ctx = ctx.clone();
+        //             let (sender, promise) = Promise::new();
+        //             let request = ehttp::Request::get(&self.url);
+        //             ehttp::fetch(request, move |response| {
+        //                 ctx.request_repaint(); // wake up UI thread
+        //                 let resource =
+        //                     response.map(|response| Resource::from_response(&ctx, response));
+        //                 sender.send(resource);
+        //             });
+        //             self.promise = Some(promise);
+        //         }
+
+        //         ui.horizontal(|ui| {
+        //             ui.selectable_value(&mut self.demo, ScrollDemo::ScrollTo, "Parameters");
+        //             ui.selectable_value(&mut self.demo, ScrollDemo::ManyLines, "Body");
+        //             ui.selectable_value(&mut self.demo, ScrollDemo::LargeCanvas, "Headers");
+        //         });
+
+        //         match self.demo {
+        //             ScrollDemo::ScrollTo => {
+        //                 // self.scroll_to.ui(ui);
+        //             }
+        //             ScrollDemo::ManyLines => {
+        //                 huge_content_lines(ui);
+        //             }
+        //             ScrollDemo::LargeCanvas => {
+        //                 huge_content_lines(ui);
+        //             }
+        //         }
+        //     });
+
+        // CentralPanel::default().show(ctx, |ui| {
+        //     if let Some(promise) = &self.promise {
+        //         if let Some(result) = promise.ready() {
+        //             match result {
+        //                 Ok(resource) => {
+        //                     ui_resource(ui, resource);
+        //                 }
+        //                 Err(error) => {
+        //                     // This should only happen if the fetch API isn't available or something similar.
+        //                     ui.colored_label(
+        //                         ui.visuals().error_fg_color,
+        //                         if error.is_empty() { "Error" } else { error },
+        //                     );
+        //                 }
+        //             }
+        //         } else {
+        //             ui.spinner();
+        //         }
+        //     }
+        // });
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -162,25 +361,51 @@ impl eframe::App for HttpApp {
     }
 }
 
-fn ui_url(ui: &mut egui::Ui, frame: &mut eframe::Frame, url: &mut String) -> bool {
+fn ui_url(ui: &mut egui::Ui, method: &mut Method, url: &mut String) -> bool {
     let mut trigger_fetch = false;
 
     ui.horizontal(|ui| {
-        ui.label("URL:");
-        ui.add(egui::TextEdit::singleline(url).desired_width(f32::INFINITY));
-    });
+        egui::ComboBox::from_label("")
+            .selected_text(format!("{:?}", method))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(method, Method::Get, "Get");
+                ui.selectable_value(method, Method::Post, "Post");
+                ui.selectable_value(method, Method::Put, "Put");
+                ui.selectable_value(method, Method::Patch, "Patch");
+                ui.selectable_value(method, Method::Delete, "Delete");
+                ui.selectable_value(method, Method::Head, "Head");
+            });
 
-    if frame.is_web() {
-        ui.label("HINT: paste the url of this page into the field above!");
-    }
+        ui.add(egui::TextEdit::singleline(url));
 
-    ui.horizontal(|ui| {
         if ui.button("Go").clicked() {
             trigger_fetch = true;
         }
     });
 
     trigger_fetch
+}
+
+fn huge_content_lines(ui: &mut egui::Ui) {
+    ui.label(
+        "A lot of rows, but only the visible ones are layed out, so performance is still good:",
+    );
+    ui.add_space(4.0);
+
+    let text_style = TextStyle::Body;
+    let row_height = ui.text_style_height(&text_style);
+    let num_rows = 10_000;
+    ScrollArea::vertical().auto_shrink([false; 2]).show_rows(
+        ui,
+        row_height,
+        num_rows,
+        |ui, row_range| {
+            for row in row_range {
+                let text = format!("This is row {}/{}", row + 1, num_rows);
+                ui.label(text);
+            }
+        },
+    );
 }
 
 fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
