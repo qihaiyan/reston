@@ -5,26 +5,30 @@ edition = "2021"
 publish = false
 
 #[features]
-#default = ["glow", "http"]
-
-#http = ["ehttp"]
-
-syntax_highlighting = ["lib/syntax_highlighting"]
-
-#glow = ["eframe/glow"]
+#syntax_highlighting = ["lib/syntax_highlighting"]
 
 [dependencies]
-eframe = { version = "0.19.0"}
-egui = "0.19.0" 
-tracing = "0.1"
-glow = { version = "0.11", optional = true }
+egui = "0.19.0"
+eframe = { version = "0.19.0", features = ["persistence"] }
+serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 egui_extras = "0.19.0"
-egui_dock = "0.2.1"
+egui_dock = { version = "0.2.1", features = ["serde"] }
 
 # feature "http":
 ehttp = "0.2.0"
 poll-promise = "0.1"
 
+syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
+
 # native:
-#[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-#tracing-subscriber = "0.3"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tracing-subscriber = "0.3"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.6"
+tracing-wasm = "0.2"
+
+
+[profile.release]
+opt-level = 2 # fast and small wasm
