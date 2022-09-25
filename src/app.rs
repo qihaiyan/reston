@@ -65,6 +65,19 @@ impl Default for ScrollDemo {
     }
 }
 
+#[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+struct ApiCollection {
+    name: String,
+    buffers: BTreeMap<String, String>,
+}
+
+impl ApiCollection {
+    pub fn new(name: String, buffers: BTreeMap<String, String>) -> Self {
+        Self { name, buffers }
+    }
+}
+
 // #[derive(Debug, PartialEq)]
 // struct Location {
 //     name: String,
@@ -121,8 +134,23 @@ impl TabViewer for MyContext {
         Frame::none()
             .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
-                let url = self.buffers.get_mut(tab).unwrap();
-                let trigger_fetch = ui_url(ui, &mut self.method, url);
+                // let url = {
+                //     match self.buffers.get_mut(tab) {
+                //         Some(x) => x,
+                //         None => {
+                //             self.buffers.insert("".to_owned(), "".to_owned());
+                //             return "";
+                //         }
+                //     }
+                // };
+                let mut url = "".to_owned();
+                if let Some(u) = self.buffers.get_mut(tab) {
+                    url = u.to_owned();
+                } else {
+                    self.buffers.insert("".to_owned(), "".to_owned());
+                }
+
+                let trigger_fetch = ui_url(ui, &mut self.method, &mut url);
 
                 if trigger_fetch {
                     let ctx = ui.ctx().clone();
@@ -184,7 +212,7 @@ impl TabViewer for MyContext {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
-    cats: Vec<String>,
+    api_collection: Vec<ApiCollection>,
     search: String,
     #[serde(skip)]
     method: Method,
@@ -206,11 +234,12 @@ impl Default for HttpApp {
             "https://httpbin.org/anything".into(),
         );
         buffers.insert("Item F".into(), "Item G".into());
-        let context = MyContext::new("Simple Demo".to_owned(), buffers);
+        let context = MyContext::new("Simple Demo".to_owned(), buffers.clone());
+        let api_collection = ApiCollection::new("Widgets 1".to_owned(), buffers);
         Self {
             promise: Default::default(),
             search: "".to_owned(),
-            cats: vec!["Widgets 1".to_owned(), "Widgets 2".to_owned()],
+            api_collection: vec![api_collection],
             method: Method::Get,
             demo: ScrollDemo::ScrollTo,
             tree: Default::default(),
@@ -261,14 +290,19 @@ impl eframe::App for HttpApp {
                     });
 
                     if ui.button("Add").clicked() {
-                        self.cats.push(format!("new {}", self.cats.len()));
+                        self.api_collection.push(ApiCollection::new(
+                            format!("new {}", self.api_collection.len()),
+                            BTreeMap::new(),
+                        ));
                     }
 
-                    for cat in &self.cats {
-                        CollapsingHeader::new(cat)
-                            .default_open(true)
-                            .show(ui, |ui| {
-                                for (name, _url) in &self.context.buffers {
+                    for ac in self.api_collection.iter_mut() {
+                        ui.horizontal(|ui| {
+                            if ui.button("add").clicked() {
+                                ac.buffers.insert("a".to_owned(), "b".to_owned());
+                            };
+                            ui.collapsing(ac.name.clone(), |ui| {
+                                for (name, _url) in &ac.buffers {
                                     let tab_location = self.tree.find_tab(name);
                                     let is_open = tab_location.is_some();
                                     if ui.selectable_label(is_open, name.clone()).clicked() {
@@ -280,6 +314,7 @@ impl eframe::App for HttpApp {
                                     }
                                 }
                             });
+                        });
                     }
                 });
             });
