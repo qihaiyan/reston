@@ -1,14 +1,11 @@
 use std::collections::BTreeMap;
 
-use eframe::{egui, Storage};
+use eframe::egui;
 use egui::{
-    style::Margin, text::LayoutJob, Align, Button, CentralPanel, CollapsingHeader, Color32, FontId,
-    Frame, Label, ScrollArea, SidePanel, Slider, TextFormat, TextStyle, TopBottomPanel, Ui,
-    WidgetText, Window,
+    style::Margin, CollapsingHeader, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui,
+    WidgetText,
 };
-use egui_dock::{
-    DockArea, TabViewer
-};
+use egui_dock::{DockArea, TabViewer};
 use poll_promise::Promise;
 
 struct Resource {
@@ -54,8 +51,8 @@ impl Default for Method {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum ScrollDemo {
     ScrollTo,
     ManyLines,
@@ -124,8 +121,8 @@ impl TabViewer for MyContext {
         Frame::none()
             .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
-                let mut url = self.buffers.get(tab).unwrap().clone().into();
-                let trigger_fetch = ui_url(ui, &mut self.method, &mut url);
+                let url = self.buffers.get_mut(tab).unwrap();
+                let trigger_fetch = ui_url(ui, &mut self.method, url);
 
                 if trigger_fetch {
                     let ctx = ui.ctx().clone();
@@ -281,15 +278,6 @@ impl eframe::App for HttpApp {
                                             self.tree.push_to_focused_leaf(name.clone());
                                         }
                                     }
-                                    // if ui
-                                    //     .selectable_label(false, item.get(0).unwrap().to_string())
-                                    //     .clicked()
-                                    // {
-                                    //     self.url = item.get(1).unwrap().to_string();
-                                    // }
-                                    // if ui.button(item.get(0).unwrap()).clicked() {
-                                    //     self.url = item.get(1).unwrap().to_string();
-                                    // }
                                 }
                             });
                     }
