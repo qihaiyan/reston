@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use eframe::egui;
 use egui::{
-    style::Margin, CollapsingHeader, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui,
-    WidgetText,
+    style::Margin, CollapsingHeader, Frame, ScrollArea, SidePanel, TextBuffer, TextStyle,
+    TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
 use poll_promise::Promise;
@@ -143,11 +143,12 @@ impl TabViewer for MyContext {
                 //         }
                 //     }
                 // };
-                let mut url = "".to_owned();
+                let mut url;
                 if let Some(u) = self.buffers.get_mut(tab) {
-                    url = u.to_owned();
+                    url = u;
                 } else {
                     self.buffers.insert("".to_owned(), "".to_owned());
+                    url = self.buffers.get_mut(tab).unwrap()
                 }
 
                 let trigger_fetch = ui_url(ui, &mut self.method, &mut url);
@@ -173,7 +174,18 @@ impl TabViewer for MyContext {
 
                 match self.demo {
                     ScrollDemo::ScrollTo => {
-                        // self.scroll_to.ui(ui);
+                        ui.label("Query Parameters");
+                        egui::Grid::new("response_headers")
+                            .num_columns(2)
+                            .striped(true)
+                            // .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add(egui::TextEdit::singleline(&mut "".to_owned()));
+                                    ui.add(egui::TextEdit::singleline(&mut "".to_owned()));
+                                });
+                                ui.end_row();
+                            });
                     }
                     ScrollDemo::ManyLines => {
                         huge_content_lines(ui);
