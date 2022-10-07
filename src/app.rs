@@ -87,18 +87,6 @@ struct Location {
     header: Vec<(String, String)>,
 }
 
-// impl Default for Location {
-//     fn default() -> Self {
-//         Self {
-//             url: "".into(),
-//             name: "".into(),
-//             query: HashMap::new(),
-//             body: "".into(),
-//             header: HashMap::new(),
-//         }
-//     }
-// }
-
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct MyContext {
@@ -148,7 +136,17 @@ impl TabViewer for MyContext {
                 if trigger_fetch {
                     let ctx = ui.ctx().clone();
                     let (sender, promise) = Promise::new();
-                    let request = ehttp::Request::get(&location.url);
+                    let request = ehttp::Request {
+                        headers: location
+                            .header
+                            .iter()
+                            .filter(|e| (e.0.is_empty() == false))
+                            .map(|e| (e.0.to_owned(), e.1.to_owned()))
+                            .collect(),
+                        method: "GET".to_owned(),
+                        url: location.url.to_owned(),
+                        body: vec![],
+                    };
                     ehttp::fetch(request, move |response| {
                         ctx.request_repaint(); // wake up UI thread
                         let resource =
