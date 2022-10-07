@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use eframe::egui;
 use egui::{
-    style::Margin, CollapsingHeader, Frame, ScrollArea, SidePanel, TextBuffer, TextStyle,
-    TopBottomPanel, Ui, WidgetText,
+    style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
 use poll_promise::Promise;
@@ -69,32 +68,33 @@ impl Default for ScrollDemo {
 #[serde(default)]
 struct ApiCollection {
     name: String,
-    buffers: BTreeMap<String, String>,
+    buffers: BTreeMap<String, Location>,
 }
 
 impl ApiCollection {
-    pub fn new(name: String, buffers: BTreeMap<String, String>) -> Self {
+    pub fn new(name: String, buffers: BTreeMap<String, Location>) -> Self {
         Self { name, buffers }
     }
 }
 
-// #[derive(Debug, PartialEq)]
-// struct Location {
-//     name: String,
-//     url: String,
-// }
-
-// impl Location {
-//     pub fn new(name: String, url: String) -> Self {
-//         Self { name, url }
-//     }
-// }
+#[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+struct Location {
+    name: String,
+    url: String,
+    query: HashMap<String, String>,
+    body: String,
+    header: Vec<(String, String)>,
+}
 
 // impl Default for Location {
 //     fn default() -> Self {
 //         Self {
 //             url: "".into(),
 //             name: "".into(),
+//             query: HashMap::new(),
+//             body: "".into(),
+//             header: HashMap::new(),
 //         }
 //     }
 // }
@@ -103,7 +103,7 @@ impl ApiCollection {
 #[serde(default)]
 struct MyContext {
     // #[serde(skip)]
-    buffers: BTreeMap<String, String>,
+    buffers: BTreeMap<String, Location>,
     name: String,
     // url: String,
     #[serde(skip)]
@@ -115,7 +115,7 @@ struct MyContext {
 }
 
 impl MyContext {
-    pub fn new(name: String, buffers: BTreeMap<String, String>) -> Self {
+    pub fn new(name: String, buffers: BTreeMap<String, Location>) -> Self {
         Self {
             buffers,
             name,
@@ -134,29 +134,21 @@ impl TabViewer for MyContext {
         Frame::none()
             .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
-                // let url = {
-                //     match self.buffers.get_mut(tab) {
-                //         Some(x) => x,
-                //         None => {
-                //             self.buffers.insert("".to_owned(), "".to_owned());
-                //             return "";
-                //         }
-                //     }
-                // };
-                let mut url;
+                let mut add_location = false;
+                let location;
                 if let Some(u) = self.buffers.get_mut(tab) {
-                    url = u;
+                    location = u;
                 } else {
-                    self.buffers.insert("".to_owned(), "".to_owned());
-                    url = self.buffers.get_mut(tab).unwrap()
+                    self.buffers.insert("".to_owned(), Location::default());
+                    location = self.buffers.get_mut(tab).unwrap()
                 }
 
-                let trigger_fetch = ui_url(ui, &mut self.method, &mut url);
+                let trigger_fetch = ui_url(ui, &mut self.method, &mut location.url);
 
                 if trigger_fetch {
                     let ctx = ui.ctx().clone();
                     let (sender, promise) = Promise::new();
-                    let request = ehttp::Request::get(&url);
+                    let request = ehttp::Request::get(&location.url);
                     ehttp::fetch(request, move |response| {
                         ctx.request_repaint(); // wake up UI thread
                         let resource =
@@ -167,24 +159,43 @@ impl TabViewer for MyContext {
                 }
 
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.demo, ScrollDemo::ScrollTo, "Parameters");
+                    ui.selectable_value(&mut self.demo, ScrollDemo::ScrollTo, "Params");
                     ui.selectable_value(&mut self.demo, ScrollDemo::ManyLines, "Body");
                     ui.selectable_value(&mut self.demo, ScrollDemo::LargeCanvas, "Headers");
                 });
 
                 match self.demo {
                     ScrollDemo::ScrollTo => {
-                        ui.label("Query Parameters");
-                        egui::Grid::new("response_headers")
-                            .num_columns(2)
-                            .striped(true)
-                            // .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.add(egui::TextEdit::singleline(&mut "".to_owned()));
-                                    ui.add(egui::TextEdit::singleline(&mut "".to_owned()));
-                                });
+                        ui.horizontal(|ui| {
+                            ui.label("Query Params");
+                            if ui.button("add").clicked() {
+                                add_location = true;
+                                location.header.push(("".to_owned(), "".to_owned()));
+                                // });
                                 ui.end_row();
+                            }
+                        });
+                        egui::Grid::new("query_params")
+                            .num_columns(2)
+                            // .striped(true)
+                            .spacing(egui::vec2(
+                                ui.spacing().item_spacing.x * 0.5,
+                                ui.spacing().item_spacing.x * 0.5,
+                            ))
+                            .show(ui, |ui| {
+                                // ui.horizontal(|ui| {
+                                if location.header.is_empty() {
+                                    location.header.push(("".to_owned(), "".to_owned()));
+                                    // });
+                                    ui.end_row();
+                                }
+
+                                for (key, value) in &mut location.header {
+                                    ui.add(egui::TextEdit::singleline(key));
+                                    ui.add(egui::TextEdit::singleline(value));
+                                    // });
+                                    ui.end_row();
+                                }
                             });
                     }
                     ScrollDemo::ManyLines => {
@@ -239,13 +250,23 @@ pub struct HttpApp {
 
 impl Default for HttpApp {
     fn default() -> Self {
-        let mut buffers: BTreeMap<String, String> = BTreeMap::default();
-        buffers.insert("Item get".into(), "https://httpbin.org/get".into());
-        buffers.insert(
-            "Item anything".into(),
-            "https://httpbin.org/anything".into(),
-        );
-        buffers.insert("Item F".into(), "Item G".into());
+        let mut buffers: BTreeMap<String, Location> = BTreeMap::default();
+        let location1: Location = Location {
+            name: ("Item get".into()),
+            url: ("https://httpbin.org/get".into()),
+            query: (HashMap::new()),
+            body: ("".into()),
+            header: (vec![("".to_owned(), "".to_owned())]),
+        };
+        let location2: Location = Location {
+            name: ("Item anything".into()),
+            url: ("https://httpbin.org/anything".into()),
+            query: (HashMap::new()),
+            body: ("".into()),
+            header: (vec![("".to_owned(), "".to_owned())]),
+        };
+        buffers.insert("Item get".into(), location1);
+        buffers.insert("Item anything".into(), location2);
         let context = MyContext::new("Simple Demo".to_owned(), buffers.clone());
         let api_collection = ApiCollection::new("Widgets 1".to_owned(), buffers);
         Self {
@@ -311,7 +332,14 @@ impl eframe::App for HttpApp {
                     for ac in self.api_collection.iter_mut() {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
-                                ac.buffers.insert("a".to_owned(), "b".to_owned());
+                                let location1: Location = Location {
+                                    name: ("Item get".into()),
+                                    url: ("https://httpbin.org/get".into()),
+                                    query: (HashMap::new()),
+                                    body: ("".into()),
+                                    header: (vec![("".to_owned(), "".to_owned())]),
+                                };
+                                ac.buffers.insert("a".to_owned(), location1);
                             };
                             ui.collapsing(ac.name.clone(), |ui| {
                                 for (name, _url) in &ac.buffers {
