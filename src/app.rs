@@ -33,7 +33,7 @@ impl Resource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum Method {
     Get,
@@ -52,15 +52,29 @@ impl Default for Method {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-enum ScrollDemo {
-    ScrollTo,
-    ManyLines,
-    LargeCanvas,
+enum ContentType {
+    Json,
+    FormData,
+    FormUrlEncoded,
 }
 
-impl Default for ScrollDemo {
+impl Default for ContentType {
     fn default() -> Self {
-        Self::ScrollTo
+        Self::Json
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+enum RequestEditor {
+    Params,
+    Body,
+    Headers,
+}
+
+impl Default for RequestEditor {
+    fn default() -> Self {
+        Self::Params
     }
 }
 
@@ -78,13 +92,16 @@ impl ApiCollection {
 }
 
 #[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
-#[serde(default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct Location {
     name: String,
     url: String,
-    query: HashMap<String, String>,
+    params: Vec<(String, String)>,
     body: String,
+    form_params: Vec<(String, String)>,
     header: Vec<(String, String)>,
+    #[serde(skip)]
+    content_type: ContentType,
 }
 
 #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -97,7 +114,7 @@ struct MyContext {
     #[serde(skip)]
     method: Method,
     #[serde(skip)]
-    demo: ScrollDemo,
+    reqest_editor: RequestEditor,
     #[serde(skip)]
     promise: Option<Promise<ehttp::Result<Resource>>>,
 }
@@ -109,7 +126,7 @@ impl MyContext {
             name,
             // url,
             method: Method::Get,
-            demo: ScrollDemo::ScrollTo,
+            reqest_editor: RequestEditor::Params,
             promise: Default::default(),
         }
     }
@@ -157,19 +174,18 @@ impl TabViewer for MyContext {
                 }
 
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.demo, ScrollDemo::ScrollTo, "Params");
-                    ui.selectable_value(&mut self.demo, ScrollDemo::ManyLines, "Body");
-                    ui.selectable_value(&mut self.demo, ScrollDemo::LargeCanvas, "Headers");
+                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Params, "Params");
+                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Body, "Body");
+                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Headers, "Headers");
                 });
 
-                match self.demo {
-                    ScrollDemo::ScrollTo => {
+                match self.reqest_editor {
+                    RequestEditor::Params => {
                         ui.horizontal(|ui| {
                             ui.label("Query Params");
                             if ui.button("add").clicked() {
                                 add_location = true;
-                                location.header.push(("".to_owned(), "".to_owned()));
-                                // });
+                                location.params.push(("".to_owned(), "".to_owned()));
                                 ui.end_row();
                             }
                         });
@@ -183,13 +199,115 @@ impl TabViewer for MyContext {
                             ))
                             .show(ui, |ui| {
                                 // ui.horizontal(|ui| {
+                                if location.params.is_empty() {
+                                    location.params.push(("".to_owned(), "".to_owned()));
+                                    // });
+                                    ui.end_row();
+                                }
+
+                                let mut i = 0 as usize;
+                                while i < location.params.len() {
+                                    ui.add(egui::TextEdit::singleline(&mut location.params[i].0));
+                                    ui.add(egui::TextEdit::singleline(&mut location.params[i].1));
+                                    if ui.button("del").clicked() {
+                                        location.params.remove(i);
+                                    }
+                                    i = i + 1;
+                                    ui.end_row();
+                                }
+                            });
+                    }
+                    RequestEditor::Body => {
+                        ui.horizontal(|ui| {
+                            ui.radio_value(
+                                &mut location.content_type,
+                                ContentType::Json,
+                                "application/json",
+                            );
+                            ui.radio_value(
+                                &mut location.content_type,
+                                ContentType::FormData,
+                                "form-data",
+                            );
+                            ui.radio_value(
+                                &mut location.content_type,
+                                ContentType::FormUrlEncoded,
+                                "x-www-form-url-encoded",
+                            );
+                        });
+                        if location.content_type == ContentType::Json {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut location.body)
+                                    .font(egui::TextStyle::Monospace) // for cursor height
+                                    .code_editor()
+                                    .desired_rows(10)
+                                    .lock_focus(true)
+                                    .desired_width(f32::INFINITY),
+                            );
+                        } else {
+                            ui.horizontal(|ui| {
+                                ui.label("Request Body");
+                                if ui.button("add").clicked() {
+                                    add_location = true;
+                                    location.form_params.push(("".to_owned(), "".to_owned()));
+                                    ui.end_row();
+                                }
+                            });
+                            egui::Grid::new("request_body")
+                                .num_columns(3)
+                                .min_col_width(300.0)
+                                .spacing(egui::vec2(
+                                    ui.spacing().item_spacing.x * 0.5,
+                                    ui.spacing().item_spacing.x * 0.5,
+                                ))
+                                .show(ui, |ui| {
+                                    // ui.horizontal(|ui| {
+                                    if location.form_params.is_empty() {
+                                        location.form_params.push(("".to_owned(), "".to_owned()));
+                                        // });
+                                        ui.end_row();
+                                    }
+
+                                    let mut i = 0 as usize;
+                                    while i < location.form_params.len() {
+                                        ui.add(egui::TextEdit::singleline(
+                                            &mut location.form_params[i].0,
+                                        ));
+                                        ui.add(egui::TextEdit::singleline(
+                                            &mut location.form_params[i].1,
+                                        ));
+                                        if ui.button("del").clicked() {
+                                            location.form_params.remove(i);
+                                        }
+                                        i = i + 1;
+                                        ui.end_row();
+                                    }
+                                });
+                        }
+                    }
+                    RequestEditor::Headers => {
+                        ui.horizontal(|ui| {
+                            ui.label("Headers");
+                            if ui.button("add").clicked() {
+                                add_location = true;
+                                location.header.push(("".to_owned(), "".to_owned()));
+                                ui.end_row();
+                            }
+                        });
+                        egui::Grid::new("query_headers")
+                            .num_columns(3)
+                            .min_col_width(300.0)
+                            .spacing(egui::vec2(
+                                ui.spacing().item_spacing.x * 0.5,
+                                ui.spacing().item_spacing.x * 0.5,
+                            ))
+                            .show(ui, |ui| {
+                                // ui.horizontal(|ui| {
                                 if location.header.is_empty() {
                                     location.header.push(("".to_owned(), "".to_owned()));
                                     // });
                                     ui.end_row();
                                 }
-
-                                let show_del = false;
 
                                 let mut i = 0 as usize;
                                 while i < location.header.len() {
@@ -202,12 +320,6 @@ impl TabViewer for MyContext {
                                     ui.end_row();
                                 }
                             });
-                    }
-                    ScrollDemo::ManyLines => {
-                        huge_content_lines(ui);
-                    }
-                    ScrollDemo::LargeCanvas => {
-                        huge_content_lines(ui);
                     }
                 }
 
@@ -245,7 +357,7 @@ pub struct HttpApp {
     #[serde(skip)]
     method: Method,
     #[serde(skip)]
-    demo: ScrollDemo,
+    demo: RequestEditor,
     tree: egui_dock::Tree<String>,
     context: MyContext,
 
@@ -259,16 +371,20 @@ impl Default for HttpApp {
         let location1: Location = Location {
             name: ("Item get".into()),
             url: ("https://httpbin.org/get".into()),
-            query: (HashMap::new()),
+            params: (Vec::new()),
             body: ("".into()),
             header: (vec![("".to_owned(), "".to_owned())]),
+            content_type: ContentType::Json,
+            form_params: Vec::new(),
         };
         let location2: Location = Location {
             name: ("Item anything".into()),
             url: ("https://httpbin.org/anything".into()),
-            query: (HashMap::new()),
+            params: (Vec::new()),
             body: ("".into()),
             header: (vec![("".to_owned(), "".to_owned())]),
+            content_type: ContentType::Json,
+            form_params: Vec::new(),
         };
         buffers.insert("Item get".into(), location1);
         buffers.insert("Item anything".into(), location2);
@@ -279,7 +395,7 @@ impl Default for HttpApp {
             search: "".to_owned(),
             api_collection: vec![api_collection],
             method: Method::Get,
-            demo: ScrollDemo::ScrollTo,
+            demo: RequestEditor::Params,
             tree: Default::default(),
             context,
         }
@@ -340,9 +456,11 @@ impl eframe::App for HttpApp {
                                 let location1: Location = Location {
                                     name: ("Item get".into()),
                                     url: ("https://httpbin.org/get".into()),
-                                    query: (HashMap::new()),
+                                    params: (Vec::new()),
                                     body: ("".into()),
                                     header: (vec![("".to_owned(), "".to_owned())]),
+                                    content_type: ContentType::Json,
+                                    form_params: Vec::new(),
                                 };
                                 ac.buffers.insert("a".to_owned(), location1);
                             };
