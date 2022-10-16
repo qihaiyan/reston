@@ -174,7 +174,8 @@ impl TabViewer for MyContext {
                             }
                         });
                         egui::Grid::new("query_params")
-                            .num_columns(2)
+                            .num_columns(3)
+                            .min_col_width(300.0)
                             // .striped(true)
                             .spacing(egui::vec2(
                                 ui.spacing().item_spacing.x * 0.5,
@@ -188,10 +189,16 @@ impl TabViewer for MyContext {
                                     ui.end_row();
                                 }
 
-                                for (key, value) in &mut location.header {
-                                    ui.add(egui::TextEdit::singleline(key));
-                                    ui.add(egui::TextEdit::singleline(value));
-                                    // });
+                                let show_del = false;
+
+                                let mut i = 0 as usize;
+                                while i < location.header.len() {
+                                    ui.add(egui::TextEdit::singleline(&mut location.header[i].0));
+                                    ui.add(egui::TextEdit::singleline(&mut location.header[i].1));
+                                    if ui.button("del").clicked() {
+                                        location.header.remove(i);
+                                    }
+                                    i = i + 1;
                                     ui.end_row();
                                 }
                             });
