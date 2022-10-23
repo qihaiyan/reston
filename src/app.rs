@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Read,
+};
 
 use eframe::egui;
 use egui::{
@@ -9,21 +12,22 @@ use poll_promise::Promise;
 
 struct Resource {
     /// HTTP response
-    response: ehttp::Response,
+    response: reqwest::blocking::Response,
 
     text: Option<String>,
 
-    /// If set, the response was text with some supported syntax highlighting (e.g. ".rs" or ".md").
+    // If set, the response was text with some supported syntax highlighting (e.g. ".rs" or ".md").
     colored_text: Option<ColoredText>,
 }
 
 impl Resource {
-    fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Self {
-        let content_type = response.content_type().unwrap_or_default();
+    fn from_response(mut response: reqwest::blocking::Response) -> Self {
+        let content_type = response.headers().get(reqwest::header::CONTENT_TYPE);
 
-        let text = response.text();
-        let colored_text = text.and_then(|text| syntax_highlighting(ctx, &response, text));
-        let text = text.map(|text| text.to_owned());
+        let mut text = String::new();
+        response.read_to_string(&mut text).unwrap();
+        let colored_text = syntax_highlighting(&text);
+        let text = Some(text);
 
         Self {
             response,
@@ -111,12 +115,15 @@ struct MyContext {
     buffers: BTreeMap<String, Location>,
     name: String,
     // url: String,
+    body: String,
     #[serde(skip)]
     method: Method,
     #[serde(skip)]
     reqest_editor: RequestEditor,
     #[serde(skip)]
-    promise: Option<Promise<ehttp::Result<Resource>>>,
+    promise: Option<Promise<reqwest::blocking::Response>>,
+    #[serde(skip)]
+    response: Option<reqwest::blocking::Response>,
 }
 
 impl MyContext {
@@ -125,9 +132,11 @@ impl MyContext {
             buffers,
             name,
             // url,
+            body: "".to_string(),
             method: Method::Get,
             reqest_editor: RequestEditor::Params,
             promise: Default::default(),
+            response: Default::default(),
         }
     }
 }
@@ -151,26 +160,13 @@ impl TabViewer for MyContext {
                 let trigger_fetch = ui_url(ui, &mut self.method, &mut location.url);
 
                 if trigger_fetch {
-                    let ctx = ui.ctx().clone();
-                    let (sender, promise) = Promise::new();
-                    let request = ehttp::Request {
-                        headers: location
-                            .header
-                            .iter()
-                            .filter(|e| (e.0.is_empty() == false))
-                            .map(|e| (e.0.to_owned(), e.1.to_owned()))
-                            .collect(),
-                        method: "GET".to_owned(),
-                        url: location.url.to_owned(),
-                        body: vec![],
-                    };
-                    ehttp::fetch(request, move |response| {
-                        ctx.request_repaint(); // wake up UI thread
-                        let resource =
-                            response.map(|response| Resource::from_response(&ctx, response));
-                        sender.send(resource);
-                    });
-                    self.promise = Some(promise);
+                    self.response = reqwest::blocking::get(location.url.to_owned()).ok();
+
+                    if let Some(response) = &mut self.response {
+                        let mut buf = String::new();
+                        response.read_to_string(&mut buf).unwrap();
+                        self.body = buf;
+                    }
                 }
 
                 ui.horizontal(|ui| {
@@ -323,23 +319,8 @@ impl TabViewer for MyContext {
                     }
                 }
 
-                if let Some(promise) = &self.promise {
-                    if let Some(result) = promise.ready() {
-                        match result {
-                            Ok(resource) => {
-                                ui_resource(ui, resource);
-                            }
-                            Err(error) => {
-                                // This should only happen if the fetch API isn't available or something similar.
-                                ui.colored_label(
-                                    ui.visuals().error_fg_color,
-                                    if error.is_empty() { "Error" } else { error },
-                                );
-                            }
-                        }
-                    } else {
-                        ui.spinner();
-                    }
+                if let Some(response) = &mut self.response {
+                    ui_resource(ui, self.body.clone(), response);
                 }
             });
     }
@@ -360,9 +341,6 @@ pub struct HttpApp {
     demo: RequestEditor,
     tree: egui_dock::Tree<String>,
     context: MyContext,
-
-    #[serde(skip)]
-    promise: Option<Promise<ehttp::Result<Resource>>>,
 }
 
 impl Default for HttpApp {
@@ -391,7 +369,6 @@ impl Default for HttpApp {
         let context = MyContext::new("Simple Demo".to_owned(), buffers.clone());
         let api_collection = ApiCollection::new("Widgets 1".to_owned(), buffers);
         Self {
-            promise: Default::default(),
             search: "".to_owned(),
             api_collection: vec![api_collection],
             method: Method::Get,
@@ -538,25 +515,32 @@ fn huge_content_lines(ui: &mut egui::Ui) {
     );
 }
 
-fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
-    let Resource {
-        response,
-        text,
-        colored_text,
-    } = resource;
+fn ui_resource(ui: &mut egui::Ui, text: String, response: &mut reqwest::blocking::Response) {
+    // let Resource {
+    //     response,
+    //     text,
+    //     colored_text,
+    // } = resource;
 
-    ui.monospace(format!("url:          {}", response.url));
+    let colored_text = syntax_highlighting(&text);
+    let text = Some(text);
+
+    ui.monospace(format!("url:          {}", response.url()));
     ui.monospace(format!(
         "status:       {} ({})",
-        response.status, response.status_text
+        response.status(),
+        response.status().to_owned()
     ));
     ui.monospace(format!(
-        "content-type: {}",
-        response.content_type().unwrap_or_default()
+        "content-type: {:?}",
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .unwrap()
     ));
     ui.monospace(format!(
         "size:         {:.1} kB",
-        response.bytes.len() as f32 / 1000.0
+        response.content_length().unwrap() as f32 / 1000.0
     ));
 
     ui.separator();
@@ -570,9 +554,9 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
                     egui::Grid::new("response_headers")
                         .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
                         .show(ui, |ui| {
-                            for header in &response.headers {
-                                ui.label(header.0);
-                                ui.label(header.1);
+                            for (key, value) in response.headers() {
+                                ui.label(key.to_string());
+                                ui.label(value.to_str().unwrap());
                                 ui.end_row();
                             }
                         })
@@ -624,7 +608,7 @@ fn syntax_highlighting(
 }
 
 #[cfg(not(feature = "syntect"))]
-fn syntax_highlighting(_ctx: &egui::Context, _: &ehttp::Response, _: &str) -> Option<ColoredText> {
+fn syntax_highlighting(_: &str) -> Option<ColoredText> {
     None
 }
 
