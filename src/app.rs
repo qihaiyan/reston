@@ -9,6 +9,7 @@ use egui::{
 };
 use egui_dock::{DockArea, TabViewer};
 use poll_promise::Promise;
+use reqwest::header::{HeaderMap};
 
 struct Resource {
     /// HTTP response
@@ -160,7 +161,21 @@ impl TabViewer for MyContext {
                 let trigger_fetch = ui_url(ui, &mut self.method, &mut location.url);
 
                 if trigger_fetch {
-                    self.response = reqwest::blocking::get(location.url.to_owned()).ok();
+                    let map: HashMap<String, String> = location
+                        .header
+                        .iter()
+                        .filter(|e| (e.0.is_empty() == false))
+                        .map(|e| (e.0.to_owned(), e.1.to_owned()))
+                        .collect();
+
+                    let headers: HeaderMap = (&map).try_into().expect("valid headers");
+
+                    let client = reqwest::blocking::Client::new();
+                    self.response = client
+                        .get(location.url.to_owned())
+                        .headers(headers)
+                        .send()
+                        .ok();
 
                     if let Some(response) = &mut self.response {
                         let mut buf = String::new();
