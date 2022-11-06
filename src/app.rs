@@ -1,40 +1,53 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::Read,
-};
+use std::collections::BTreeMap;
 
 use eframe::egui;
 use egui::{
     style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
-use poll_promise::Promise;
-use reqwest::header::{HeaderMap};
 
+#[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 struct Resource {
     /// HTTP response
-    response: reqwest::blocking::Response,
-
-    text: Option<String>,
-
+    url: String,
+    body: String,
+    headers: Vec<(String, String)>,
+    length: String,
+    content_type: String,
+    status: usize,
+    status_text: String,
     // If set, the response was text with some supported syntax highlighting (e.g. ".rs" or ".md").
-    colored_text: Option<ColoredText>,
+    // colored_text: Option<ColoredText>,
 }
 
 impl Resource {
-    fn from_response(mut response: reqwest::blocking::Response) -> Self {
-        let content_type = response.headers().get(reqwest::header::CONTENT_TYPE);
+    fn from_response(response: Option<ureq::Response>) -> Option<Self> {
+        if let Some(response) = response {
+            let url = response.get_url().to_string();
+            let status = response.status().into();
+            let status_text = response.status_text().to_string();
+            let length = response.header("Content-Length").unwrap().to_string();
+            let content_type = response.content_type().to_string();
 
-        let mut text = String::new();
-        response.read_to_string(&mut text).unwrap();
-        let colored_text = syntax_highlighting(&text);
-        let text = Some(text);
+            let mut headers = Vec::new();
+            for key in response.headers_names() {
+                headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
+            }
 
-        Self {
-            response,
-            text,
-            colored_text,
+            let body = response.into_string().unwrap().to_string();
+
+            return Some(Self {
+                url,
+                body,
+                headers,
+                length,
+                content_type,
+                status,
+                status_text,
+            });
         }
+        return None;
     }
 }
 
@@ -52,6 +65,19 @@ enum Method {
 impl Default for Method {
     fn default() -> Self {
         Self::Get
+    }
+}
+
+impl Method {
+    fn to_text(self: &Self) -> String {
+        match self {
+            Method::Get => "GET".to_owned(),
+            Method::Post => "POST".to_owned(),
+            Method::Put => "PUT".to_owned(),
+            Method::Patch => "PATCH".to_owned(),
+            Method::Delete => "DELETE".to_owned(),
+            Method::Head => "HEAD".to_owned(),
+        }
     }
 }
 
@@ -112,19 +138,13 @@ struct Location {
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct MyContext {
-    // #[serde(skip)]
     buffers: BTreeMap<String, Location>,
     name: String,
-    // url: String,
-    body: String,
+    resource: Option<Resource>,
     #[serde(skip)]
     method: Method,
     #[serde(skip)]
     reqest_editor: RequestEditor,
-    #[serde(skip)]
-    promise: Option<Promise<reqwest::blocking::Response>>,
-    #[serde(skip)]
-    response: Option<reqwest::blocking::Response>,
 }
 
 impl MyContext {
@@ -132,12 +152,9 @@ impl MyContext {
         Self {
             buffers,
             name,
-            // url,
-            body: "".to_string(),
             method: Method::Get,
             reqest_editor: RequestEditor::Params,
-            promise: Default::default(),
-            response: Default::default(),
+            resource: Default::default(),
         }
     }
 }
@@ -161,27 +178,24 @@ impl TabViewer for MyContext {
                 let trigger_fetch = ui_url(ui, &mut self.method, &mut location.url);
 
                 if trigger_fetch {
-                    let map: HashMap<String, String> = location
-                        .header
-                        .iter()
-                        .filter(|e| (e.0.is_empty() == false))
-                        .map(|e| (e.0.to_owned(), e.1.to_owned()))
-                        .collect();
+                    let mut request = ureq::request(&self.method.to_text(), &location.url);
 
-                    let headers: HeaderMap = (&map).try_into().expect("valid headers");
-
-                    let client = reqwest::blocking::Client::new();
-                    self.response = client
-                        .get(location.url.to_owned())
-                        .headers(headers)
-                        .send()
-                        .ok();
-
-                    if let Some(response) = &mut self.response {
-                        let mut buf = String::new();
-                        response.read_to_string(&mut buf).unwrap();
-                        self.body = buf;
+                    let headers = location.header.iter().filter(|e| (e.0.is_empty() == false));
+                    for e in headers {
+                        request = request.set(&e.0, &e.1);
                     }
+
+                    self.resource = Resource::from_response(match self.method {
+                        Method::Get => {
+                            let params =
+                                location.params.iter().filter(|e| (e.0.is_empty() == false));
+                            for e in params {
+                                request = request.query(&e.0, &e.1);
+                            }
+                            request.call().ok()
+                        }
+                        _ => request.send_string(&location.body).ok(),
+                    });
                 }
 
                 ui.horizontal(|ui| {
@@ -203,7 +217,6 @@ impl TabViewer for MyContext {
                         egui::Grid::new("query_params")
                             .num_columns(3)
                             .min_col_width(300.0)
-                            // .striped(true)
                             .spacing(egui::vec2(
                                 ui.spacing().item_spacing.x * 0.5,
                                 ui.spacing().item_spacing.x * 0.5,
@@ -334,8 +347,8 @@ impl TabViewer for MyContext {
                     }
                 }
 
-                if let Some(response) = &mut self.response {
-                    ui_resource(ui, self.body.clone(), response);
+                if let Some(resource) = &self.resource {
+                    ui_resource(ui, resource);
                 }
             });
     }
@@ -530,35 +543,18 @@ fn huge_content_lines(ui: &mut egui::Ui) {
     );
 }
 
-fn ui_resource(ui: &mut egui::Ui, text: String, response: &mut reqwest::blocking::Response) {
-    // let Resource {
-    //     response,
-    //     text,
-    //     colored_text,
-    // } = resource;
-
-    let colored_text = syntax_highlighting(&text);
-    let text = Some(text);
-
-    ui.monospace(format!("url:          {}", response.url()));
+fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
+    ui.monospace(format!("url:          {}", resource.url));
     ui.monospace(format!(
         "status:       {} ({})",
-        response.status(),
-        response.status().to_owned()
+        resource.status, resource.status_text
     ));
-    ui.monospace(format!(
-        "content-type: {:?}",
-        response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .unwrap()
-    ));
-    ui.monospace(format!(
-        "size:         {:.1} kB",
-        response.content_length().unwrap() as f32 / 1000.0
-    ));
+    ui.monospace(format!("content-type: {:?}", resource.content_type));
+    ui.monospace(format!("size:         {:.1} kB", resource.length));
 
     ui.separator();
+
+    let colored_text = syntax_highlighting(&resource.body);
 
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
@@ -569,9 +565,9 @@ fn ui_resource(ui: &mut egui::Ui, text: String, response: &mut reqwest::blocking
                     egui::Grid::new("response_headers")
                         .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
                         .show(ui, |ui| {
-                            for (key, value) in response.headers() {
-                                ui.label(key.to_string());
-                                ui.label(value.to_str().unwrap());
+                            for (key, value) in &resource.headers {
+                                ui.label(key);
+                                ui.label(value);
                                 ui.end_row();
                             }
                         })
@@ -579,17 +575,15 @@ fn ui_resource(ui: &mut egui::Ui, text: String, response: &mut reqwest::blocking
 
             ui.separator();
 
-            if let Some(text) = &text {
-                let tooltip = "Click to copy the response body";
-                if ui.button("📋").on_hover_text(tooltip).clicked() {
-                    ui.output().copied_text = text.clone();
-                }
-                ui.separator();
+            let tooltip = "Click to copy the response body";
+            if ui.button("📋").on_hover_text(tooltip).clicked() {
+                ui.output().copied_text = resource.body.clone();
             }
+            ui.separator();
 
             if let Some(colored_text) = colored_text {
                 colored_text.ui(ui);
-            } else if let Some(text) = &text {
+            } else if let Some(text) = Some(&resource.body) {
                 selectable_text(ui, text);
             } else {
                 ui.monospace("[binary]");
