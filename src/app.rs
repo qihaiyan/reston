@@ -127,6 +127,8 @@ impl ApiCollection {
 struct Location {
     name: String,
     url: String,
+    #[serde(skip)]
+    method: Method,
     params: Vec<(String, String)>,
     body: String,
     form_params: Vec<(String, String)>,
@@ -194,7 +196,26 @@ impl TabViewer for MyContext {
                             }
                             request.call().ok()
                         }
-                        _ => request.send_string(&location.body).ok(),
+                        Method::Post => match location.content_type {
+                            ContentType::Json => request.send_string(&location.body).ok(),
+                            ContentType::FormUrlEncoded => {
+                                let params =
+                                    location.params.iter().filter(|e| (e.0.is_empty() == false));
+                                for e in params {
+                                    request = request.query(&e.0, &e.1);
+                                }
+                                let from_param: Vec<(&str, &str)> = location
+                                    .form_params
+                                    .as_slice()
+                                    .into_iter()
+                                    .map(|f| (f.0.as_str(), f.1.as_str()))
+                                    .collect();
+                                // request.send_form(&location.form_params.as_slice().into_iter().map(|f|(f.0.as_str(),f.1.as_str())).collect()[..]).ok()
+                                request.send_form(&from_param[..]).ok()
+                            }
+                            _ => request.call().ok(),
+                        },
+                        _ => request.call().ok(),
                     });
                 }
 
@@ -382,6 +403,7 @@ impl Default for HttpApp {
             header: (vec![("".to_owned(), "".to_owned())]),
             content_type: ContentType::Json,
             form_params: Vec::new(),
+            method: Method::Get,
         };
         let location2: Location = Location {
             name: ("Item anything".into()),
@@ -391,6 +413,7 @@ impl Default for HttpApp {
             header: (vec![("".to_owned(), "".to_owned())]),
             content_type: ContentType::Json,
             form_params: Vec::new(),
+            method: Method::Get,
         };
         buffers.insert("Item get".into(), location1);
         buffers.insert("Item anything".into(), location2);
@@ -466,6 +489,7 @@ impl eframe::App for HttpApp {
                                     header: (vec![("".to_owned(), "".to_owned())]),
                                     content_type: ContentType::Json,
                                     form_params: Vec::new(),
+                                    method: Method::Get,
                                 };
                                 ac.buffers.insert("a".to_owned(), location1);
                             };
