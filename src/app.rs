@@ -51,7 +51,7 @@ impl Resource {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum Method {
     Get,
@@ -81,12 +81,12 @@ impl Method {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum ContentType {
     Json,
-    FormData,
     FormUrlEncoded,
+    FormData,
 }
 
 impl Default for ContentType {
@@ -95,7 +95,7 @@ impl Default for ContentType {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum RequestEditor {
     Params,
@@ -127,13 +127,11 @@ impl ApiCollection {
 struct Location {
     name: String,
     url: String,
-    #[serde(skip)]
     method: Method,
     params: Vec<(String, String)>,
     body: String,
     form_params: Vec<(String, String)>,
     header: Vec<(String, String)>,
-    #[serde(skip)]
     content_type: ContentType,
 }
 
@@ -143,9 +141,6 @@ struct MyContext {
     buffers: BTreeMap<String, Location>,
     name: String,
     resource: Option<Resource>,
-    #[serde(skip)]
-    method: Method,
-    #[serde(skip)]
     reqest_editor: RequestEditor,
 }
 
@@ -154,7 +149,6 @@ impl MyContext {
         Self {
             buffers,
             name,
-            method: Method::Get,
             reqest_editor: RequestEditor::Params,
             resource: Default::default(),
         }
@@ -177,17 +171,17 @@ impl TabViewer for MyContext {
                     location = self.buffers.get_mut(tab).unwrap()
                 }
 
-                let trigger_fetch = ui_url(ui, &mut self.method, &mut location.url);
+                let trigger_fetch = ui_url(ui, &mut location.method, &mut location.url);
 
                 if trigger_fetch {
-                    let mut request = ureq::request(&self.method.to_text(), &location.url);
+                    let mut request = ureq::request(&location.method.to_text(), &location.url);
 
                     let headers = location.header.iter().filter(|e| (e.0.is_empty() == false));
                     for e in headers {
                         request = request.set(&e.0, &e.1);
                     }
 
-                    self.resource = Resource::from_response(match self.method {
+                    self.resource = Resource::from_response(match location.method {
                         Method::Get => {
                             let params =
                                 location.params.iter().filter(|e| (e.0.is_empty() == false));
