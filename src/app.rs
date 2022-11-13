@@ -168,7 +168,7 @@ impl TabViewer for MyContext {
                     location = u;
                 } else {
                     self.buffers.insert("".to_owned(), Location::default());
-                    location = self.buffers.get_mut(tab).unwrap()
+                    location = self.buffers.get_mut("").unwrap()
                 }
 
                 let trigger_fetch = ui_url(ui, &mut location.method, &mut location.url);
@@ -204,7 +204,6 @@ impl TabViewer for MyContext {
                                     .into_iter()
                                     .map(|f| (f.0.as_str(), f.1.as_str()))
                                     .collect();
-                                // request.send_form(&location.form_params.as_slice().into_iter().map(|f|(f.0.as_str(),f.1.as_str())).collect()[..]).ok()
                                 request.send_form(&from_param[..]).ok()
                             }
                             _ => request.call().ok(),
@@ -485,20 +484,27 @@ impl eframe::App for HttpApp {
                                     form_params: Vec::new(),
                                     method: Method::Get,
                                 };
-                                ac.buffers.insert("a".to_owned(), location1);
+                                ac.buffers.insert("new request".to_owned(), location1);
                             };
                             ui.collapsing(ac.name.clone(), |ui| {
-                                for (name, _url) in &ac.buffers {
+                                let mut localtion_del = "".to_owned();
+                                for (name, location) in &ac.buffers {
                                     let tab_location = self.tree.find_tab(name);
                                     let is_open = tab_location.is_some();
-                                    if ui.selectable_label(is_open, name.clone()).clicked() {
-                                        if let Some((node_index, tab_index)) = tab_location {
-                                            self.tree.set_active_tab(node_index, tab_index);
-                                        } else {
-                                            self.tree.push_to_focused_leaf(name.clone());
+                                    ui.horizontal(|ui| {
+                                        if ui.selectable_label(is_open, name.clone()).clicked() {
+                                            if let Some((node_index, tab_index)) = tab_location {
+                                                self.tree.set_active_tab(node_index, tab_index);
+                                            } else {
+                                                self.tree.push_to_focused_leaf(name.clone());
+                                            }
                                         }
-                                    }
+                                        if ui.button("del").clicked() {
+                                            localtion_del = location.to_owned().url;
+                                        };
+                                    });
                                 }
+                                ac.buffers.retain(|_, v| v.url != localtion_del)
                             });
                         });
                     }
