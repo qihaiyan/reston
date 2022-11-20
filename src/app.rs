@@ -5,6 +5,7 @@ use egui::{
     style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
+use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -125,6 +126,7 @@ impl ApiCollection {
 #[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct Location {
+    id: String,
     name: String,
     url: String,
     method: Method,
@@ -389,6 +391,7 @@ impl Default for HttpApp {
     fn default() -> Self {
         let mut buffers: BTreeMap<String, Location> = BTreeMap::default();
         let location1: Location = Location {
+            id: Uuid::new_v4().to_string(),
             name: ("Item get".into()),
             url: ("https://httpbin.org/get".into()),
             params: (Vec::new()),
@@ -399,6 +402,7 @@ impl Default for HttpApp {
             method: Method::Get,
         };
         let location2: Location = Location {
+            id: Uuid::new_v4().to_string(),
             name: ("Item anything".into()),
             url: ("https://httpbin.org/anything".into()),
             params: (Vec::new()),
@@ -475,6 +479,7 @@ impl eframe::App for HttpApp {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
                                 let location1: Location = Location {
+                                    id: Uuid::new_v4().to_string(),
                                     name: ("Item get".into()),
                                     url: ("https://httpbin.org/get".into()),
                                     params: (Vec::new()),

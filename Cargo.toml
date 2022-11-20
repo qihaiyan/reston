@@ -24,6 +24,14 @@ poll-promise = "0.1"
 
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
 
+[dependencies.uuid]
+version = "1.2.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = "0.3"
