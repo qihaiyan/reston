@@ -110,7 +110,7 @@ impl Default for RequestEditor {
     }
 }
 
-#[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, PartialEq, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct ApiCollection {
     name: String,
@@ -140,16 +140,16 @@ struct Location {
 #[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct MyContext {
-    buffers: BTreeMap<String, Location>,
+    api_collection: ApiCollection,
     name: String,
     resource: Option<Resource>,
     reqest_editor: RequestEditor,
 }
 
 impl MyContext {
-    pub fn new(name: String, buffers: BTreeMap<String, Location>) -> Self {
+    pub fn new(name: String, api_collection: ApiCollection) -> Self {
         Self {
-            buffers,
+            api_collection,
             name,
             reqest_editor: RequestEditor::Params,
             resource: Default::default(),
@@ -165,13 +165,7 @@ impl TabViewer for MyContext {
             .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
                 let mut add_location = false;
-                let location;
-                if let Some(u) = self.buffers.get_mut(tab) {
-                    location = u;
-                } else {
-                    self.buffers.insert("".to_owned(), Location::default());
-                    location = self.buffers.get_mut("").unwrap()
-                }
+                let location = self.api_collection.buffers.get_mut(tab).unwrap();
 
                 let trigger_fetch = ui_url(ui, &mut location.method, &mut location.url);
 
@@ -379,50 +373,17 @@ impl TabViewer for MyContext {
 pub struct HttpApp {
     api_collection: Vec<ApiCollection>,
     search: String,
-    #[serde(skip)]
-    method: Method,
-    #[serde(skip)]
-    demo: RequestEditor,
     tree: egui_dock::Tree<String>,
     context: MyContext,
 }
 
 impl Default for HttpApp {
     fn default() -> Self {
-        let mut buffers: BTreeMap<String, Location> = BTreeMap::default();
-        let location1: Location = Location {
-            id: Uuid::new_v4().to_string(),
-            name: ("Item get".into()),
-            url: ("https://httpbin.org/get".into()),
-            params: (Vec::new()),
-            body: ("".into()),
-            header: (vec![("".to_owned(), "".to_owned())]),
-            content_type: ContentType::Json,
-            form_params: Vec::new(),
-            method: Method::Get,
-        };
-        let location2: Location = Location {
-            id: Uuid::new_v4().to_string(),
-            name: ("Item anything".into()),
-            url: ("https://httpbin.org/anything".into()),
-            params: (Vec::new()),
-            body: ("".into()),
-            header: (vec![("".to_owned(), "".to_owned())]),
-            content_type: ContentType::Json,
-            form_params: Vec::new(),
-            method: Method::Get,
-        };
-        buffers.insert("Item get".into(), location1);
-        buffers.insert("Item anything".into(), location2);
-        let context = MyContext::new("Simple Demo".to_owned(), buffers.clone());
-        let api_collection = ApiCollection::new("Widgets 1".to_owned(), buffers);
         Self {
             search: "".to_owned(),
-            api_collection: vec![api_collection],
-            method: Method::Get,
-            demo: RequestEditor::Params,
+            api_collection: vec![],
             tree: Default::default(),
-            context,
+            context: MyContext::default(),
         }
     }
 }
@@ -478,8 +439,9 @@ impl eframe::App for HttpApp {
                     for ac in self.api_collection.iter_mut() {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
-                                let location1: Location = Location {
-                                    id: Uuid::new_v4().to_string(),
+                                let id = Uuid::new_v4().to_string();
+                                let location: Location = Location {
+                                    id: id.clone(),
                                     name: ("Item get".into()),
                                     url: ("https://httpbin.org/get".into()),
                                     params: (Vec::new()),
@@ -489,7 +451,11 @@ impl eframe::App for HttpApp {
                                     form_params: Vec::new(),
                                     method: Method::Get,
                                 };
-                                ac.buffers.insert("new request".to_owned(), location1);
+                                ac.buffers.insert(id.clone(), location.clone());
+                                self.context
+                                    .api_collection
+                                    .buffers
+                                    .insert(id, location.clone());
                             };
                             ui.collapsing(ac.name.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
