@@ -167,7 +167,7 @@ impl TabViewer for MyContext {
                 let mut add_location = false;
                 let location = self.api_collection.buffers.get_mut(tab).unwrap();
 
-                let trigger_fetch = ui_url(ui, &mut location.method, &mut location.url);
+                let trigger_fetch = ui_url(ui, location);
 
                 if trigger_fetch {
                     let mut request = ureq::request(&location.method.to_text(), &location.url);
@@ -364,14 +364,15 @@ impl TabViewer for MyContext {
     }
 
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
-        egui::WidgetText::from(&*tab)
+        let name = &self.api_collection.buffers.get_mut(tab).unwrap().name;
+        egui::WidgetText::from(name)
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
-    api_collection: Vec<ApiCollection>,
+    directory: BTreeMap<String, Vec<String>>,
     search: String,
     tree: egui_dock::Tree<String>,
     context: MyContext,
@@ -381,7 +382,7 @@ impl Default for HttpApp {
     fn default() -> Self {
         Self {
             search: "".to_owned(),
-            api_collection: vec![],
+            directory: BTreeMap::default(),
             tree: Default::default(),
             context: MyContext::default(),
         }
@@ -430,13 +431,10 @@ impl eframe::App for HttpApp {
                     });
 
                     if ui.button("Add").clicked() {
-                        self.api_collection.push(ApiCollection::new(
-                            format!("new {}", self.api_collection.len()),
-                            BTreeMap::new(),
-                        ));
+                        self.directory.insert(format!("new {}", self.directory.len()), Vec::new());
                     }
 
-                    for ac in self.api_collection.iter_mut() {
+                    for dir in self.directory.iter_mut() {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
                                 let id = Uuid::new_v4().to_string();
@@ -451,31 +449,31 @@ impl eframe::App for HttpApp {
                                     form_params: Vec::new(),
                                     method: Method::Get,
                                 };
-                                ac.buffers.insert(id.clone(), location.clone());
+                                dir.1.push(id.clone());
                                 self.context
                                     .api_collection
                                     .buffers
                                     .insert(id, location.clone());
                             };
-                            ui.collapsing(ac.name.clone(), |ui| {
+                            ui.collapsing(dir.0.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
-                                for (name, location) in &ac.buffers {
-                                    let tab_location = self.tree.find_tab(name);
+                                for id in dir.1.into_iter() {
+                                    let tab_location = self.tree.find_tab(id);
                                     let is_open = tab_location.is_some();
                                     ui.horizontal(|ui| {
-                                        if ui.selectable_label(is_open, name.clone()).clicked() {
+                                        if ui.selectable_label(is_open, id.clone()).clicked() {
                                             if let Some((node_index, tab_index)) = tab_location {
                                                 self.tree.set_active_tab(node_index, tab_index);
                                             } else {
-                                                self.tree.push_to_focused_leaf(name.clone());
+                                                self.tree.push_to_focused_leaf(id.clone());
                                             }
                                         }
                                         if ui.button("del").clicked() {
-                                            localtion_del = location.to_owned().url;
+                                            localtion_del = id.to_owned();
                                         };
                                     });
                                 }
-                                ac.buffers.retain(|_, v| v.url != localtion_del)
+                                dir.1.retain(|v| v != &localtion_del)
                             });
                         });
                     }
@@ -491,22 +489,25 @@ impl eframe::App for HttpApp {
     }
 }
 
-fn ui_url(ui: &mut egui::Ui, method: &mut Method, url: &mut String) -> bool {
+fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
     let mut trigger_fetch = false;
+
+    ui.add(egui::TextEdit::singleline(&mut location.name));
+    ui.separator();
 
     ui.horizontal(|ui| {
         egui::ComboBox::from_label("")
-            .selected_text(format!("{:?}", method))
+            .selected_text(format!("{:?}", location.method))
             .show_ui(ui, |ui| {
-                ui.selectable_value(method, Method::Get, "Get");
-                ui.selectable_value(method, Method::Post, "Post");
-                ui.selectable_value(method, Method::Put, "Put");
-                ui.selectable_value(method, Method::Patch, "Patch");
-                ui.selectable_value(method, Method::Delete, "Delete");
-                ui.selectable_value(method, Method::Head, "Head");
+                ui.selectable_value(&mut location.method, Method::Get, "Get");
+                ui.selectable_value(&mut location.method, Method::Post, "Post");
+                ui.selectable_value(&mut location.method, Method::Put, "Put");
+                ui.selectable_value(&mut location.method, Method::Patch, "Patch");
+                ui.selectable_value(&mut location.method, Method::Delete, "Delete");
+                ui.selectable_value(&mut location.method, Method::Head, "Head");
             });
 
-        ui.add(egui::TextEdit::singleline(url));
+        ui.add(egui::TextEdit::singleline(&mut location.url));
 
         if ui.button("Go").clicked() {
             trigger_fetch = true;
