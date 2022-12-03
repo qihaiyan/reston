@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::Read};
 
 use eframe::egui;
 use egui::{
@@ -135,6 +135,63 @@ struct Location {
     form_params: Vec<(String, String)>,
     header: Vec<(String, String)>,
     content_type: ContentType,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct Postman {
+    info: PostmanInfo,
+    item: Vec<PostmanItem>,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanInfo {
+    name: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanItem {
+    id: String,
+    name: String,
+    request: PostmanRequest,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanRequest {
+    method: String,
+    header: Vec<PostmanHeader>,
+    body: PostmanBody,
+    url: PostmanUrl,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanHeader {
+    key: String,
+    value: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanUrl {
+    raw: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanBody {
+    urlencoded: Vec<PostmanForm>,
+    raw: String,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct PostmanForm {
+    key: String,
+    value: String,
 }
 
 #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -438,7 +495,25 @@ impl eframe::App for HttpApp {
                         }
                         if ui.button("Import").clicked() {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
-                                self.picked_path = Some(path.display().to_string());
+                                let fpath = path.display().to_string();
+                                let fname = std::path::Path::new(&fpath);
+                                let zipfile = std::fs::File::open(fname).unwrap();
+
+                                let mut archive = zip::ZipArchive::new(zipfile).unwrap();
+
+                                for i in 0..archive.len() {
+                                    let mut file = archive.by_index(i).unwrap();
+                                    let mut contents = String::new();
+                                    file.read_to_string(&mut contents).unwrap();
+                                    let p: Postman = serde_json::from_str(&contents).unwrap();
+                                    egui::Window::new("postman").show(ctx, |ui| {
+                                        ui.add(
+                                            egui::TextEdit::multiline(&mut contents)
+                                                .desired_width(f32::INFINITY)
+                                                .font(egui::TextStyle::Monospace),
+                                        );
+                                    });
+                                }
                             }
                         }
                     });
