@@ -376,6 +376,7 @@ pub struct HttpApp {
     search: String,
     tree: egui_dock::Tree<String>,
     context: MyContext,
+    picked_path: Option<String>,
 }
 
 impl Default for HttpApp {
@@ -385,6 +386,7 @@ impl Default for HttpApp {
             directory: BTreeMap::default(),
             tree: Default::default(),
             context: MyContext::default(),
+            picked_path: Default::default(),
         }
     }
 }
@@ -429,10 +431,17 @@ impl eframe::App for HttpApp {
                                 .desired_width(f32::INFINITY),
                         );
                     });
-
-                    if ui.button("Add").clicked() {
-                        self.directory.insert(format!("new {}", self.directory.len()), Vec::new());
-                    }
+                    ui.horizontal(|ui| {
+                        if ui.button("Add").clicked() {
+                            self.directory
+                                .insert(format!("new {}", self.directory.len()), Vec::new());
+                        }
+                        if ui.button("Import").clicked() {
+                            if let Some(path) = rfd::FileDialog::new().pick_file() {
+                                self.picked_path = Some(path.display().to_string());
+                            }
+                        }
+                    });
 
                     for dir in self.directory.iter_mut() {
                         ui.horizontal(|ui| {

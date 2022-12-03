@@ -20,7 +20,11 @@ egui_dock = { version = "0.2.1", features = ["serde"] }
 ureq = { version = "2.5.0", features = ["json"] }
 #reqwest = { version = "0.11", features = ["blocking", "json"] }
 #ehttp = "0.2.0"
-poll-promise = "0.1"
+#poll-promise = "0.1"
+
+rfd = "0.10"
+zip = "0.6.3"
+openapiv3 = "1.0.1"
 
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
 
