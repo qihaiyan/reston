@@ -147,6 +147,7 @@ struct Postman {
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct PostmanInfo {
+    _postman_id: String,
     name: String,
 }
 
@@ -429,7 +430,7 @@ impl TabViewer for MyContext {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
-    directory: BTreeMap<String, Vec<String>>,
+    directory: BTreeMap<String, BTreeMap<String, String>>,
     search: String,
     tree: egui_dock::Tree<String>,
     context: MyContext,
@@ -491,7 +492,7 @@ impl eframe::App for HttpApp {
                     ui.horizontal(|ui| {
                         if ui.button("Add").clicked() {
                             self.directory
-                                .insert(format!("new {}", self.directory.len()), Vec::new());
+                                .insert(format!("new {}", self.directory.len()), BTreeMap::new());
                         }
                         if ui.button("Import").clicked() {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
@@ -506,13 +507,26 @@ impl eframe::App for HttpApp {
                                     let mut contents = String::new();
                                     file.read_to_string(&mut contents).unwrap();
                                     let p: Postman = serde_json::from_str(&contents).unwrap();
-                                    egui::Window::new("postman").show(ctx, |ui| {
-                                        ui.add(
-                                            egui::TextEdit::multiline(&mut contents)
-                                                .desired_width(f32::INFINITY)
-                                                .font(egui::TextStyle::Monospace),
-                                        );
-                                    });
+                                    let mut item_map: BTreeMap<String, String> = BTreeMap::new();
+                                    for item in p.item.into_iter() {
+                                        item_map.insert(item.id.clone(), item.name.clone());
+                                        let location: Location = Location {
+                                            id: item.id.clone(),
+                                            name: (item.name.clone()),
+                                            url: (item.request.url.raw.clone()),
+                                            params: (Vec::new()),
+                                            body: ("".into()),
+                                            header: (vec![("".to_owned(), "".to_owned())]),
+                                            content_type: ContentType::Json,
+                                            form_params: Vec::new(),
+                                            method: Method::Get,
+                                        };
+                                        self.context
+                                            .api_collection
+                                            .buffers
+                                            .insert(item.id.clone(), location.clone());
+                                    }
+                                    self.directory.insert(p.info.name, item_map);
                                 }
                             }
                         }
@@ -533,7 +547,7 @@ impl eframe::App for HttpApp {
                                     form_params: Vec::new(),
                                     method: Method::Get,
                                 };
-                                dir.1.push(id.clone());
+                                dir.1.insert(id.clone(), location.name.clone());
                                 self.context
                                     .api_collection
                                     .buffers
@@ -541,11 +555,11 @@ impl eframe::App for HttpApp {
                             };
                             ui.collapsing(dir.0.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
-                                for id in dir.1.into_iter() {
+                                for (id, name) in dir.1.into_iter() {
                                     let tab_location = self.tree.find_tab(id);
                                     let is_open = tab_location.is_some();
                                     ui.horizontal(|ui| {
-                                        if ui.selectable_label(is_open, id.clone()).clicked() {
+                                        if ui.selectable_label(is_open, name.clone()).clicked() {
                                             if let Some((node_index, tab_index)) = tab_location {
                                                 self.tree.set_active_tab(node_index, tab_index);
                                             } else {
@@ -557,7 +571,7 @@ impl eframe::App for HttpApp {
                                         };
                                     });
                                 }
-                                dir.1.retain(|v| v != &localtion_del)
+                                dir.1.retain(|v, _| v != &localtion_del)
                             });
                         });
                     }
