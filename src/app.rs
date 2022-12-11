@@ -82,6 +82,26 @@ impl Method {
     }
 }
 
+impl Method {
+    fn from_text(method: String) -> Method {
+        if method.to_uppercase() == "GET" {
+            return Method::Get;
+        } else if method.to_uppercase() == "POST" {
+            return Method::Post;
+        } else if method.to_uppercase() == "PUT" {
+            return Method::Post;
+        } else if method.to_uppercase() == "PATCH" {
+            return Method::Patch;
+        } else if method.to_uppercase() == "DELETE" {
+            return Method::Delete;
+        } else if method.to_uppercase() == "HEAD" {
+            return Method::Head;
+        } else {
+            return Method::Get;
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 enum ContentType {
@@ -510,16 +530,28 @@ impl eframe::App for HttpApp {
                                     let mut items: Vec<String> = Vec::new();
                                     for item in p.item.into_iter() {
                                         items.push(item.id.clone());
+
                                         let location: Location = Location {
                                             id: item.id.clone(),
                                             name: (item.name.clone()),
                                             url: (item.request.url.raw.clone()),
                                             params: (Vec::new()),
-                                            body: ("".into()),
-                                            header: (vec![("".to_owned(), "".to_owned())]),
+                                            body: (item.request.body.raw),
+                                            header: (item
+                                                .request
+                                                .header
+                                                .into_iter()
+                                                .map(|i| (i.key, i.value))
+                                                .collect()),
                                             content_type: ContentType::Json,
-                                            form_params: Vec::new(),
-                                            method: Method::Get,
+                                            form_params: item
+                                                .request
+                                                .body
+                                                .urlencoded
+                                                .into_iter()
+                                                .map(|f| (f.key, f.value))
+                                                .collect(),
+                                            method: Method::from_text(item.request.method),
                                         };
                                         self.context
                                             .api_collection
