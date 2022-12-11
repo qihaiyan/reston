@@ -551,6 +551,7 @@ impl eframe::App for HttpApp {
                         }
                     });
 
+                    let mut dir_del = "".to_owned();
                     for dir in self.directory.iter_mut() {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
@@ -571,6 +572,9 @@ impl eframe::App for HttpApp {
                                     .api_collection
                                     .buffers
                                     .insert(id, location.clone());
+                            };
+                            if ui.button("del").clicked() {
+                                dir_del = dir.0.clone();
                             };
                             ui.collapsing(dir.0.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
@@ -602,6 +606,7 @@ impl eframe::App for HttpApp {
                             });
                         });
                     }
+                    self.directory.retain(|v, _| v != &dir_del);
                 });
             });
 
