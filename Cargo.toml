@@ -20,7 +20,7 @@ egui_dock = { version = "0.3.0", features = ["serde"] }
 ureq = { version = "2.5.0", features = ["json"] }
 #reqwest = { version = "0.11", features = ["blocking", "json"] }
 #ehttp = "0.2.0"
-#poll-promise = "0.1"
+poll-promise = { version = "0.2", optional = true, default-features = false }
 
 rfd = "0.10"
 zip = "0.6.3"
