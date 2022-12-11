@@ -5,7 +5,9 @@ use egui::{
     style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
+use ureq::Error;
 use uuid::Uuid;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -23,32 +25,58 @@ struct Resource {
 }
 
 impl Resource {
-    fn from_response(response: Option<ureq::Response>) -> Option<Self> {
-        if let Some(response) = response {
-            let url = response.get_url().to_string();
-            let status = response.status().into();
-            let status_text = response.status_text().to_string();
-            let length = response.header("Content-Length").unwrap().to_string();
-            let content_type = response.content_type().to_string();
+    fn from_response(response: Result<ureq::Response>) -> Option<Self> {
+        match response {
+            Ok(response) => {
+                let url = response.get_url().to_string();
+                let status = response.status().into();
+                let status_text = response.status_text().to_string();
+                let length = response.header("Content-Length").unwrap().to_string();
+                let content_type = response.content_type().to_string();
 
-            let mut headers = Vec::new();
-            for key in response.headers_names() {
-                headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
+                let mut headers = Vec::new();
+                for key in response.headers_names() {
+                    headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
+                }
+
+                let body = response.into_string().unwrap().to_string();
+                return Some(Self {
+                    url,
+                    body,
+                    headers,
+                    length,
+                    content_type,
+                    status,
+                    status_text,
+                });
             }
+            Err(Error::Status(code, response)) => {
+                let url = response.get_url().to_string();
+                let status = response.status().into();
+                let status_text = response.status_text().to_string();
+                let length = response.header("Content-Length").unwrap().to_string();
+                let content_type = response.content_type().to_string();
 
-            let body = response.into_string().unwrap().to_string();
+                let mut headers = Vec::new();
+                for key in response.headers_names() {
+                    headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
+                }
 
-            return Some(Self {
-                url,
-                body,
-                headers,
-                length,
-                content_type,
-                status,
-                status_text,
-            });
+                let body = response.into_string().unwrap().to_string();
+                return Some(Self {
+                    url,
+                    body,
+                    headers,
+                    length,
+                    content_type,
+                    status,
+                    status_text,
+                });
+            }
+            Err(_) => {
+                return None;
+            }
         }
-        return None;
     }
 }
 
@@ -262,10 +290,10 @@ impl TabViewer for MyContext {
                             for e in params {
                                 request = request.query(&e.0, &e.1);
                             }
-                            request.call().ok()
+                            request.call()
                         }
                         Method::Post => match location.content_type {
-                            ContentType::Json => request.send_string(&location.body).ok(),
+                            ContentType::Json => request.send_string(&location.body),
                             ContentType::FormUrlEncoded => {
                                 let params =
                                     location.params.iter().filter(|e| (e.0.is_empty() == false));
@@ -278,11 +306,11 @@ impl TabViewer for MyContext {
                                     .into_iter()
                                     .map(|f| (f.0.as_str(), f.1.as_str()))
                                     .collect();
-                                request.send_form(&from_param[..]).ok()
+                                request.send_form(&from_param[..])
                             }
-                            _ => request.call().ok(),
+                            _ => request.call(),
                         },
-                        _ => request.call().ok(),
+                        _ => request.call(),
                     });
                 }
 
