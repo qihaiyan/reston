@@ -5,9 +5,9 @@ use egui::{
     style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
-use ureq::Error;
+use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -25,57 +25,31 @@ struct Resource {
 }
 
 impl Resource {
-    fn from_response(response: Result<ureq::Response>) -> Option<Self> {
-        match response {
-            Ok(response) => {
-                let url = response.get_url().to_string();
-                let status = response.status().into();
-                let status_text = response.status_text().to_string();
-                let length = response.header("Content-Length").unwrap().to_string();
-                let content_type = response.content_type().to_string();
+    fn from_response(response: Result<Response>) -> Option<Self> {
+        if let Ok(response) = response {
+            let url = response.get_url().to_string();
+            let status = response.status().into();
+            let status_text = response.status_text().to_string();
+            let length = response.header("Content-Length").unwrap().to_string();
+            let content_type = response.content_type().to_string();
 
-                let mut headers = Vec::new();
-                for key in response.headers_names() {
-                    headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
-                }
-
-                let body = response.into_string().unwrap().to_string();
-                return Some(Self {
-                    url,
-                    body,
-                    headers,
-                    length,
-                    content_type,
-                    status,
-                    status_text,
-                });
+            let mut headers = Vec::new();
+            for key in response.headers_names() {
+                headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
             }
-            Err(Error::Status(code, response)) => {
-                let url = response.get_url().to_string();
-                let status = response.status().into();
-                let status_text = response.status_text().to_string();
-                let length = response.header("Content-Length").unwrap().to_string();
-                let content_type = response.content_type().to_string();
 
-                let mut headers = Vec::new();
-                for key in response.headers_names() {
-                    headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
-                }
-
-                let body = response.into_string().unwrap().to_string();
-                return Some(Self {
-                    url,
-                    body,
-                    headers,
-                    length,
-                    content_type,
-                    status,
-                    status_text,
-                });
-            }
-            Err(_) => {
-                return None;
-            }
+            let body = response.into_string().unwrap().to_string();
+            return Some(Self {
+                url,
+                body,
+                headers,
+                length,
+                content_type,
+                status,
+                status_text,
+            });
+        } else {
+            return None;
         }
     }
 }
@@ -165,12 +139,6 @@ struct ApiCollection {
     buffers: BTreeMap<String, Location>,
 }
 
-impl ApiCollection {
-    pub fn new(name: String, buffers: BTreeMap<String, Location>) -> Self {
-        Self { name, buffers }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct Location {
@@ -252,17 +220,6 @@ struct MyContext {
     reqest_editor: RequestEditor,
 }
 
-impl MyContext {
-    pub fn new(name: String, api_collection: ApiCollection) -> Self {
-        Self {
-            api_collection,
-            name,
-            reqest_editor: RequestEditor::Params,
-            resource: Default::default(),
-        }
-    }
-}
-
 impl TabViewer for MyContext {
     type Tab = String;
 
@@ -290,10 +247,12 @@ impl TabViewer for MyContext {
                             for e in params {
                                 request = request.query(&e.0, &e.1);
                             }
-                            request.call()
+                            request.call().or_any_status()
                         }
                         Method::Post => match location.content_type {
-                            ContentType::Json => request.send_string(&location.body),
+                            ContentType::Json => {
+                                request.send_string(&location.body).or_any_status()
+                            }
                             ContentType::FormUrlEncoded => {
                                 let params =
                                     location.params.iter().filter(|e| (e.0.is_empty() == false));
@@ -306,11 +265,11 @@ impl TabViewer for MyContext {
                                     .into_iter()
                                     .map(|f| (f.0.as_str(), f.1.as_str()))
                                     .collect();
-                                request.send_form(&from_param[..])
+                                request.send_form(&from_param[..]).or_any_status()
                             }
-                            _ => request.call(),
+                            _ => request.call().or_any_status(),
                         },
-                        _ => request.call(),
+                        _ => request.call().or_any_status(),
                     });
                 }
 
