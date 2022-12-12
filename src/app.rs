@@ -16,7 +16,7 @@ struct Resource {
     url: String,
     body: String,
     headers: Vec<(String, String)>,
-    length: String,
+    length: usize,
     content_type: String,
     status: usize,
     status_text: String,
@@ -30,7 +30,11 @@ impl Resource {
             let url = response.get_url().to_string();
             let status = response.status().into();
             let status_text = response.status_text().to_string();
-            let length = response.header("Content-Length").unwrap().to_string();
+            let mut length = response
+                .header("Content-Length")
+                .unwrap_or_else(|| "0")
+                .parse()
+                .unwrap();
             let content_type = response.content_type().to_string();
 
             let mut headers = Vec::new();
@@ -38,7 +42,11 @@ impl Resource {
                 headers.push((key.to_string(), response.header(&key).unwrap().to_string()));
             }
 
-            let body = response.into_string().unwrap().to_string();
+            let body = response.into_string().unwrap_or_default().to_string();
+            let body_len = body.len();
+            if length == 0 {
+                length = body_len;
+            }
             return Some(Self {
                 url,
                 body,
@@ -677,7 +685,10 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
         resource.status, resource.status_text
     ));
     ui.monospace(format!("content-type: {:?}", resource.content_type));
-    ui.monospace(format!("size:         {:.1} kB", resource.length));
+    ui.monospace(format!(
+        "size:         {:.1} kB",
+        resource.length as f32 / 1000.0
+    ));
 
     ui.separator();
 
@@ -777,7 +788,6 @@ impl ColoredText {
     }
 }
 
-
 fn setup_custom_fonts(ctx: &egui::Context) {
     // Start with the default fonts (we will be adding to them rather than replacing them).
     let mut fonts = egui::FontDefinitions::default();
@@ -786,9 +796,7 @@ fn setup_custom_fonts(ctx: &egui::Context) {
     // .ttf and .otf files supported.
     fonts.font_data.insert(
         "my_font".to_owned(),
-        egui::FontData::from_static(include_bytes!(
-            "C:/Windows/Fonts/msyh.ttc"
-        )),
+        egui::FontData::from_static(include_bytes!("C:/Windows/Fonts/msyh.ttc")),
     );
 
     // Put my font first (highest priority) for proportional text:
