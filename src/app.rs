@@ -692,6 +692,10 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
 
     ui.separator();
 
+    let mut body = resource.body.clone();
+    body =  serde_json::from_str(&body).unwrap_or_default();
+    body =  serde_json::to_string_pretty(&body).unwrap_or_default();
+
     let colored_text = syntax_highlighting(&resource.body);
 
     egui::ScrollArea::vertical()
