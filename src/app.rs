@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io::Read};
+use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use eframe::egui;
 use egui::{
@@ -219,13 +219,31 @@ struct PostmanForm {
     value: String,
 }
 
-#[derive(Default, serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct MyContext {
     api_collection: ApiCollection,
     name: String,
     resource: Option<Resource>,
     reqest_editor: RequestEditor,
+    #[serde(skip)]
+    sender: mpsc::Sender<Resource>,
+    #[serde(skip)]
+    receiver: mpsc::Receiver<Resource>,
+}
+
+impl Default for MyContext {
+    fn default() -> Self {
+        let (sender, receiver) = mpsc::channel();
+        Self {
+            api_collection: Default::default(),
+            name: "".to_string(),
+            resource: Default::default(),
+            reqest_editor: Default::default(),
+            sender,
+            receiver,
+        }
+    }
 }
 
 impl TabViewer for MyContext {
@@ -248,37 +266,53 @@ impl TabViewer for MyContext {
                         request = request.set(&e.0, &e.1);
                     }
 
-                    self.resource = Resource::from_response(match location.method {
-                        Method::Get => {
-                            let params =
-                                location.params.iter().filter(|e| (e.0.is_empty() == false));
-                            for e in params {
-                                request = request.query(&e.0, &e.1);
-                            }
-                            request.call().or_any_status()
-                        }
-                        Method::Post => match location.content_type {
-                            ContentType::Json => {
-                                request.send_string(&location.body).or_any_status()
-                            }
-                            ContentType::FormUrlEncoded => {
-                                let params =
-                                    location.params.iter().filter(|e| (e.0.is_empty() == false));
+                    let sender = self.sender.clone();
+                    let resource_location = location.clone();
+                    let ctx = ui.ctx().clone();
+                    thread::spawn(move || {
+                        let resource = Resource::from_response(match resource_location.method {
+                            Method::Get => {
+                                let params = resource_location
+                                    .params
+                                    .iter()
+                                    .filter(|e| (e.0.is_empty() == false));
                                 for e in params {
                                     request = request.query(&e.0, &e.1);
                                 }
-                                let from_param: Vec<(&str, &str)> = location
-                                    .form_params
-                                    .as_slice()
-                                    .into_iter()
-                                    .map(|f| (f.0.as_str(), f.1.as_str()))
-                                    .collect();
-                                request.send_form(&from_param[..]).or_any_status()
+                                request.call().or_any_status()
                             }
+                            Method::Post => match resource_location.content_type {
+                                ContentType::Json => {
+                                    request.send_string(&resource_location.body).or_any_status()
+                                }
+                                ContentType::FormUrlEncoded => {
+                                    let params = resource_location
+                                        .params
+                                        .iter()
+                                        .filter(|e| (e.0.is_empty() == false));
+                                    for e in params {
+                                        request = request.query(&e.0, &e.1);
+                                    }
+                                    let from_param: Vec<(&str, &str)> = resource_location
+                                        .form_params
+                                        .as_slice()
+                                        .into_iter()
+                                        .map(|f| (f.0.as_str(), f.1.as_str()))
+                                        .collect();
+                                    request.send_form(&from_param[..]).or_any_status()
+                                }
+                                _ => request.call().or_any_status(),
+                            },
                             _ => request.call().or_any_status(),
-                        },
-                        _ => request.call().or_any_status(),
+                        });
+                        sender.send(resource.unwrap()).unwrap();
+                        ctx.request_repaint();
                     });
+                }
+
+                match self.receiver.try_recv() {
+                    Ok(resource) => self.resource = Some(resource),
+                    Err(_) => {}
                 }
 
                 ui.horizontal(|ui| {
@@ -470,7 +504,6 @@ impl HttpApp {
         if let Some(storage) = _cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
-
         Default::default()
     }
 }
@@ -693,10 +726,10 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
     ui.separator();
 
     let mut body = resource.body.clone();
-    body =  serde_json::from_str(&body).unwrap_or_default();
-    body =  serde_json::to_string_pretty(&body).unwrap_or_default();
+    body = serde_json::from_str(&body).unwrap_or_default();
+    body = serde_json::to_string_pretty(&body).unwrap_or_default();
 
-    let colored_text = syntax_highlighting(&resource.body);
+    let colored_text = syntax_highlighting(&body);
 
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
