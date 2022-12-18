@@ -5,8 +5,12 @@ use egui::{
     style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, TabViewer};
+use serde_json::Value;
+
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
+
+use crate::syntax_highlighting;
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -726,10 +730,10 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
     ui.separator();
 
     let mut body = resource.body.clone();
-    body = serde_json::from_str(&body).unwrap_or_default();
-    body = serde_json::to_string_pretty(&body).unwrap_or_default();
+    let body1: Value = serde_json::from_str(&body).unwrap();
+    body = serde_json::to_string_pretty(&body1).unwrap();
 
-    let colored_text = syntax_highlighting(&body);
+    let colored_text = syntax_highlighting(ui.ctx(), &body);
 
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
@@ -758,7 +762,7 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
 
             if let Some(colored_text) = colored_text {
                 colored_text.ui(ui);
-            } else if let Some(text) = Some(&resource.body) {
+            } else if let Some(text) = Some(&body) {
                 selectable_text(ui, text);
             } else {
                 ui.monospace("[binary]");
@@ -774,26 +778,8 @@ fn selectable_text(ui: &mut egui::Ui, mut text: &str) {
     );
 }
 
-// ----------------------------------------------------------------------------
-// Syntax highlighting:
-
-#[cfg(feature = "syntect")]
-fn syntax_highlighting(
-    ctx: &egui::Context,
-    response: &ehttp::Response,
-    text: &str,
-) -> Option<ColoredText> {
-    let extension_and_rest: Vec<&str> = response.url.rsplitn(2, '.').collect();
-    let extension = extension_and_rest.get(0)?;
-    let theme = crate::syntax_highlighting::CodeTheme::from_style(&ctx.style());
-    Some(ColoredText(crate::syntax_highlighting::highlight(
-        ctx, &theme, text, extension,
-    )))
-}
-
-#[cfg(not(feature = "syntect"))]
-fn syntax_highlighting(_: &str) -> Option<ColoredText> {
-    None
+fn syntax_highlighting(ctx: &egui::Context, text: &str) -> Option<ColoredText> {
+    Some(ColoredText(syntax_highlighting::highlight(ctx, text)))
 }
 
 struct ColoredText(egui::text::LayoutJob);
