@@ -1,9 +1,7 @@
 use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use eframe::egui;
-use egui::{
-    style::Margin, Frame, ScrollArea, SidePanel, TextStyle, TopBottomPanel, Ui, WidgetText,
-};
+use egui::{style::Margin, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText};
 use egui_dock::{DockArea, TabViewer};
 use serde_json::Value;
 
@@ -691,28 +689,6 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
     });
 
     trigger_fetch
-}
-
-fn huge_content_lines(ui: &mut egui::Ui) {
-    ui.label(
-        "A lot of rows, but only the visible ones are layed out, so performance is still good:",
-    );
-    ui.add_space(4.0);
-
-    let text_style = TextStyle::Body;
-    let row_height = ui.text_style_height(&text_style);
-    let num_rows = 10_000;
-    ScrollArea::vertical().auto_shrink([false; 2]).show_rows(
-        ui,
-        row_height,
-        num_rows,
-        |ui, row_range| {
-            for row in row_range {
-                let text = format!("This is row {}/{}", row + 1, num_rows);
-                ui.label(text);
-            }
-        },
-    );
 }
 
 fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
