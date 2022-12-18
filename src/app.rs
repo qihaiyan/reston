@@ -732,7 +732,7 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
 
             let tooltip = "Click to copy the response body";
             if ui.button("📋").on_hover_text(tooltip).clicked() {
-                ui.output().copied_text = resource.body.clone();
+                ui.output().copied_text = body.clone();
             }
             ui.separator();
 
