@@ -307,8 +307,10 @@ impl TabViewer for MyContext {
                             },
                             _ => request.call().or_any_status(),
                         });
-                        sender.send(resource.unwrap()).unwrap();
-                        ctx.request_repaint();
+                        if let Some(resource) = resource {
+                            sender.send(resource).unwrap();
+                            ctx.request_repaint();
+                        }
                     });
                 }
 
@@ -706,6 +708,9 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
     ui.separator();
 
     let mut body = resource.body.clone();
+    if body.len() < 1 {
+        return;
+    }
     let body1: Value = serde_json::from_str(&body).unwrap();
     body = serde_json::to_string_pretty(&body1).unwrap();
 
