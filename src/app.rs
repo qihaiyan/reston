@@ -1,7 +1,10 @@
+use std::hash::{Hash, Hasher};
 use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use eframe::egui;
-use egui::{style::Margin, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText};
+use egui::{
+    lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
+};
 use egui_dock::{DockArea, TabViewer};
 use serde_json::Value;
 
@@ -219,6 +222,18 @@ struct PostmanBody {
 struct PostmanForm {
     key: String,
     value: String,
+}
+
+#[derive(Clone)]
+struct Color {
+    color: Color32,
+    name: String,
+}
+
+impl Hash for Color {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state)
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -488,6 +503,10 @@ pub struct HttpApp {
     tree: egui_dock::Tree<String>,
     context: MyContext,
     picked_path: Option<String>,
+    #[serde(skip)]
+    items: Vec<Color>,
+    #[serde(skip)]
+    preview: Option<Vec<Color>>,
 }
 
 impl Default for HttpApp {
@@ -498,6 +517,21 @@ impl Default for HttpApp {
             tree: Default::default(),
             context: MyContext::default(),
             picked_path: Default::default(),
+            items: vec![
+                Color {
+                    name: "Panic Purple".to_string(),
+                    color: egui::hex_color!("642CA9"),
+                },
+                Color {
+                    name: "Generic Green".to_string(),
+                    color: egui::hex_color!("2A9D8F"),
+                },
+                Color {
+                    name: "Ownership Orange*".to_string(),
+                    color: egui::hex_color!("E9C46A"),
+                },
+            ],
+            preview: None,
         }
     }
 }
@@ -534,6 +568,19 @@ impl eframe::App for HttpApp {
         SidePanel::left("left_panel")
             .resizable(true)
             .show(ctx, |ui| {
+                vertex_gradient(
+                    ui,
+                    Default::default(),
+                    &Gradient(
+                        self.preview
+                            .as_ref()
+                            .unwrap_or(self.items.as_ref())
+                            .iter()
+                            .map(|c| c.color)
+                            .collect(),
+                    ),
+                );
+
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("search:");
@@ -683,7 +730,7 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 ui.selectable_value(&mut location.method, Method::Head, "Head");
             });
 
-        ui.add(egui::TextEdit::singleline(&mut location.url));
+        ui.text_edit_singleline(&mut location.url);
 
         if ui.button("Go").clicked() {
             trigger_fetch = true;
@@ -819,4 +866,36 @@ fn setup_custom_fonts(ctx: &egui::Context) {
 
     // Tell egui to use these fonts:
     ctx.set_fonts(fonts);
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct Gradient(pub Vec<Color32>);
+
+fn vertex_gradient(ui: &mut Ui, bg_fill: Color32, gradient: &Gradient) {
+    use egui::epaint::*;
+
+    let rect = ui.max_rect();
+
+    if bg_fill != Default::default() {
+        let mut mesh = Mesh::default();
+        mesh.add_colored_rect(rect, bg_fill);
+        ui.painter().add(Shape::mesh(mesh));
+    }
+    {
+        let n = gradient.0.len();
+        assert!(n >= 2);
+        let mut mesh = Mesh::default();
+        for (i, &color) in gradient.0.iter().enumerate() {
+            let t = i as f32 / (n as f32 - 1.0);
+            let y = lerp(rect.y_range(), t);
+            mesh.colored_vertex(pos2(rect.left(), y), color);
+            mesh.colored_vertex(pos2(rect.right(), y), color);
+            if i < n - 1 {
+                let i = i as u32;
+                mesh.add_triangle(2 * i, 2 * i + 1, 2 * i + 2);
+                mesh.add_triangle(2 * i + 1, 2 * i + 2, 2 * i + 3);
+            }
+        }
+        ui.painter().add(Shape::mesh(mesh));
+    };
 }

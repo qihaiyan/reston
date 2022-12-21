@@ -458,6 +458,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "color-hex"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecdffb913a326b6c642290a0d0ec8e8d6597291acdc07cc4c9cb4b3635d44cf9"
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,6 +766,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b601108bca3af7650440ace4ca55b2daf52c36f2635be3587d77b16efd8d0691"
 dependencies = [
  "bytemuck",
+ "color-hex",
  "serde",
 ]
 
@@ -1732,6 +1739,7 @@ dependencies = [
 name = "orient"
 version = "0.1.0"
 dependencies = [
+ "color-hex",
  "console_error_panic_hook",
  "eframe",
  "egui",
