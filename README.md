@@ -1,3 +1,3 @@
 # orient
 
-An API platform building with Rust for using APIs.
+An open-source, cross-platform and native API client for APIs, built with rust.
