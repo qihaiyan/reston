@@ -166,6 +166,16 @@ struct Location {
     content_type: ContentType,
 }
 
+#[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+struct Directory {
+    id: String,
+    name: String,
+    parent: String,
+    leaf: bool,
+    locations: Vec<String>,
+}
+
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct Postman {
@@ -498,7 +508,7 @@ impl TabViewer for MyContext {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
-    directory: BTreeMap<String, Vec<String>>,
+    directory: BTreeMap<String, Directory>,
     search: String,
     tree: egui_dock::Tree<String>,
     context: MyContext,
@@ -556,18 +566,6 @@ impl eframe::App for HttpApp {
         TopBottomPanel::bottom("http_bottom")
             .resizable(false)
             .show(ctx, |ui| {
-                let layout = egui::Layout::top_down(egui::Align::Center).with_main_justify(true);
-                ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
-                    ui.add(egui::Hyperlink::from_label_and_url(
-                        egui::RichText::new("Feedback").text_style(egui::TextStyle::Monospace),
-                        "https://github.com/qihaiyan/orient",
-                    ));
-                });
-            });
-
-        SidePanel::left("left_panel")
-            .resizable(true)
-            .show(ctx, |ui| {
                 vertex_gradient(
                     ui,
                     Default::default(),
@@ -581,6 +579,18 @@ impl eframe::App for HttpApp {
                     ),
                 );
 
+                let layout = egui::Layout::top_down(egui::Align::Center).with_main_justify(true);
+                ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
+                    ui.add(egui::Hyperlink::from_label_and_url(
+                        egui::RichText::new("Feedback").text_style(egui::TextStyle::Monospace),
+                        "https://github.com/qihaiyan/orient",
+                    ));
+                });
+            });
+
+        SidePanel::left("left_panel")
+            .resizable(true)
+            .show(ctx, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("search:");
@@ -591,8 +601,10 @@ impl eframe::App for HttpApp {
                     });
                     ui.horizontal(|ui| {
                         if ui.button("Add").clicked() {
-                            self.directory
-                                .insert(format!("new {}", self.directory.len()), Vec::new());
+                            let mut dir_node = Directory::default();
+                            dir_node.id = Uuid::new_v4().to_string();
+                            dir_node.name = format!("new {}", self.directory.len());
+                            self.directory.insert(dir_node.id.clone(), dir_node);
                         }
                         if ui.button("Import").clicked() {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
@@ -638,7 +650,11 @@ impl eframe::App for HttpApp {
                                             .buffers
                                             .insert(item.id.clone(), location.clone());
                                     }
-                                    self.directory.insert(p.info.name, items);
+                                    let mut dir_node = Directory::default();
+                                    dir_node.id = p.info._postman_id.clone();
+                                    dir_node.name = p.info.name;
+                                    dir_node.locations.append(&mut items);
+                                    self.directory.insert(p.info._postman_id.clone(), dir_node);
                                 }
                             }
                         }
@@ -660,7 +676,7 @@ impl eframe::App for HttpApp {
                                     form_params: Vec::new(),
                                     method: Method::Get,
                                 };
-                                dir.1.push(id.clone());
+                                dir.1.locations.push(id.clone());
                                 self.context
                                     .api_collection
                                     .buffers
@@ -669,10 +685,10 @@ impl eframe::App for HttpApp {
                             if ui.button("del").clicked() {
                                 dir_del = dir.0.clone();
                             };
-                            ui.collapsing(dir.0.clone(), |ui| {
+                            ui.collapsing(dir.1.name.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
-                                for id in dir.1.into_iter() {
-                                    let tab_location = self.tree.find_tab(id);
+                                for id in &dir.1.locations {
+                                    let tab_location = self.tree.find_tab(&id);
                                     let is_open = tab_location.is_some();
                                     ui.horizontal(|ui| {
                                         let name = self
@@ -695,7 +711,7 @@ impl eframe::App for HttpApp {
                                         };
                                     });
                                 }
-                                dir.1.retain(|v| v != &localtion_del)
+                                dir.1.locations.retain(|v| v != &localtion_del)
                             });
                         });
                     }
