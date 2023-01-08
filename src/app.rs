@@ -508,6 +508,7 @@ impl TabViewer for MyContext {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
+    darkmode: bool,
     directory: BTreeMap<String, Directory>,
     search: String,
     tree: egui_dock::Tree<String>,
@@ -526,6 +527,7 @@ pub struct HttpApp {
 impl Default for HttpApp {
     fn default() -> Self {
         Self {
+            darkmode: true,
             search: "".to_owned(),
             directory: BTreeMap::default(),
             tree: Default::default(),
@@ -599,6 +601,26 @@ impl eframe::App for HttpApp {
             .show(ctx, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
                     ui.horizontal(|ui| {
+                        // egui::widgets::global_dark_light_mode_switch(ui);
+                        // if self.darkmode {
+                        //     if ui
+                        //         .button("☀ Light")
+                        //         .on_hover_text("Switch to light mode")
+                        //         .clicked()
+                        //     {
+                        //         ui.ctx().set_visuals(egui::Visuals::light());
+                        //         self.darkmode = true;
+                        //     }
+                        // } else {
+                        //     if ui
+                        //         .button("🌙 Dark")
+                        //         .on_hover_text("Switch to dark mode")
+                        //         .clicked()
+                        //     {
+                        //         ui.ctx().set_visuals(egui::Visuals::dark());
+                        //         self.darkmode = false;
+                        //     }
+                        // }
                         ui.label("search:");
                         ui.add(
                             egui::TextEdit::singleline(&mut self.search)

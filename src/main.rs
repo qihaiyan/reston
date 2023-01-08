@@ -2,7 +2,25 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    let options = eframe::NativeOptions::default();
+    use eframe::{IconData, Theme};
+
+    let icon_bytes = include_bytes!("../orient.png");
+    let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
+    let (icon_width, icon_height) = icon.dimensions();
+    let options = eframe::NativeOptions {
+        drag_and_drop_support: true,
+        default_theme: Theme::Dark,
+        icon_data: Some(IconData {
+            rgba: icon.into_raw(),
+            width: icon_width,
+            height: icon_height,
+        }),
+
+        #[cfg(feature = "wgpu")]
+        renderer: eframe::Renderer::Wgpu,
+
+        ..Default::default()
+    };
     eframe::run_native(
         "Orient",
         options,
