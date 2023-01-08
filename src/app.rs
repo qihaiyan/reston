@@ -514,6 +514,10 @@ pub struct HttpApp {
     context: MyContext,
     picked_path: Option<String>,
     #[serde(skip)]
+    show_confirmation_dialog: bool,
+    #[serde(skip)]
+    dir_rename: String,
+    #[serde(skip)]
     items: Vec<Color>,
     #[serde(skip)]
     preview: Option<Vec<Color>>,
@@ -527,6 +531,8 @@ impl Default for HttpApp {
             tree: Default::default(),
             context: MyContext::default(),
             picked_path: Default::default(),
+            show_confirmation_dialog: false,
+            dir_rename: Default::default(),
             items: vec![
                 Color {
                     name: "Panic Purple".to_string(),
@@ -685,6 +691,10 @@ impl eframe::App for HttpApp {
                             if ui.button("del").clicked() {
                                 dir_del = dir.0.clone();
                             };
+                            if ui.button("rename").clicked() {
+                                self.dir_rename = dir.0.clone();
+                                self.show_confirmation_dialog = true;
+                            };
                             ui.collapsing(dir.1.name.clone(), |ui| {
                                 let mut localtion_del = "".to_owned();
                                 for id in &dir.1.locations {
@@ -716,6 +726,22 @@ impl eframe::App for HttpApp {
                         });
                     }
                     self.directory.retain(|v, _| v != &dir_del);
+                    if self.show_confirmation_dialog {
+                        egui::Window::new("")
+                            .collapsible(false)
+                            .resizable(false)
+                            .show(ctx, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.text_edit_singleline(
+                                        &mut self.directory.get_mut(&self.dir_rename).unwrap().name,
+                                    );
+                                    if ui.button("Ok").clicked() {
+                                        self.show_confirmation_dialog = false;
+                                        self.dir_rename = Default::default();
+                                    }
+                                });
+                            });
+                    }
                 });
             });
 
