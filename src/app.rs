@@ -309,9 +309,10 @@ impl TabViewer for MyContext {
                                 request.call().or_any_status()
                             }
                             Method::Post => match resource_location.content_type {
-                                ContentType::Json => {
-                                    request.send_string(&resource_location.body).or_any_status()
-                                }
+                                ContentType::Json => request
+                                    .set("Content-Type", "application/json")
+                                    .send_string(&resource_location.body)
+                                    .or_any_status(),
                                 ContentType::FormUrlEncoded => {
                                     let params = resource_location
                                         .params
@@ -406,14 +407,18 @@ impl TabViewer for MyContext {
                             );
                         });
                         if location.content_type == ContentType::Json {
-                            ui.add(
-                                egui::TextEdit::multiline(&mut location.body)
-                                    .font(egui::TextStyle::Monospace) // for cursor height
-                                    .code_editor()
-                                    .desired_rows(10)
-                                    .lock_focus(true)
-                                    .desired_width(f32::INFINITY),
-                            );
+                            ScrollArea::vertical()
+                                .id_source("source")
+                                .max_height(200.0)
+                                .auto_shrink([false; 2])
+                                .show(ui, |ui| {
+                                    ui.add(
+                                        egui::TextEdit::multiline(&mut location.body)
+                                            .code_editor()
+                                            .lock_focus(true)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                });
                         } else {
                             ui.horizontal(|ui| {
                                 ui.label("Request Body");
