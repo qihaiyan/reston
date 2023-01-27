@@ -24,7 +24,7 @@ fn main() {
     eframe::run_native(
         "RestOrient",
         options,
-        Box::new(|_cc| Box::new(RestOrient::HttpApp::new(_cc))),
+        Box::new(|_cc| Box::new(restorient::HttpApp::new(_cc))),
     );
 }
 

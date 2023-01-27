@@ -596,7 +596,7 @@ impl eframe::App for HttpApp {
                 ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
                     ui.add(egui::Hyperlink::from_label_and_url(
                         egui::RichText::new("Feedback").text_style(egui::TextStyle::Monospace),
-                        "https://github.com/qihaiyan/orient",
+                        "https://github.com/qihaiyan/restorient",
                     ));
                 });
             });
