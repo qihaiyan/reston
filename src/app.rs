@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::syntax_highlighting;
 pub type Result<T> = std::result::Result<T, Transport>;
 
-#[derive(Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 struct Resource {
     /// HTTP response
@@ -164,6 +164,7 @@ struct Location {
     form_params: Vec<(String, String)>,
     header: Vec<(String, String)>,
     content_type: ContentType,
+    response: Option<Resource>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -251,7 +252,6 @@ impl Hash for Color {
 struct MyContext {
     api_collection: ApiCollection,
     name: String,
-    resource: Option<Resource>,
     reqest_editor: RequestEditor,
     #[serde(skip)]
     sender: mpsc::Sender<Resource>,
@@ -265,7 +265,6 @@ impl Default for MyContext {
         Self {
             api_collection: Default::default(),
             name: "".to_string(),
-            resource: Default::default(),
             reqest_editor: Default::default(),
             sender,
             receiver,
@@ -341,7 +340,7 @@ impl TabViewer for MyContext {
                 }
 
                 match self.receiver.try_recv() {
-                    Ok(resource) => self.resource = Some(resource),
+                    Ok(resource) => location.response = Some(resource),
                     Err(_) => {}
                 }
 
@@ -498,9 +497,7 @@ impl TabViewer for MyContext {
                     }
                 }
 
-                if let Some(resource) = &self.resource {
-                    ui_resource(ui, resource);
-                }
+                ui_resource(ui, &location.response);
             });
     }
 
@@ -677,6 +674,7 @@ impl eframe::App for HttpApp {
                                                 .map(|f| (f.key, f.value))
                                                 .collect(),
                                             method: Method::from_text(item.request.method),
+                                            response: Default::default(),
                                         };
                                         self.context
                                             .api_collection
@@ -708,6 +706,7 @@ impl eframe::App for HttpApp {
                                     content_type: ContentType::Json,
                                     form_params: Vec::new(),
                                     method: Method::Get,
+                                    response: Default::default(),
                                 };
                                 dir.1.locations.push(id.clone());
                                 self.context
@@ -809,62 +808,64 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
     trigger_fetch
 }
 
-fn ui_resource(ui: &mut egui::Ui, resource: &Resource) {
-    ui.monospace(format!("url:          {}", resource.url));
-    ui.monospace(format!(
-        "status:       {} ({})",
-        resource.status, resource.status_text
-    ));
-    ui.monospace(format!("content-type: {:?}", resource.content_type));
-    ui.monospace(format!(
-        "size:         {:.1} kB",
-        resource.length as f32 / 1000.0
-    ));
+fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
+    if let Some(resource) = resource {
+        ui.monospace(format!("url:          {}", resource.url));
+        ui.monospace(format!(
+            "status:       {} ({})",
+            resource.status, resource.status_text
+        ));
+        ui.monospace(format!("content-type: {:?}", resource.content_type));
+        ui.monospace(format!(
+            "size:         {:.1} kB",
+            resource.length as f32 / 1000.0
+        ));
 
-    ui.separator();
+        ui.separator();
 
-    let mut body = resource.body.clone();
-    if body.len() < 1 {
-        return;
+        let mut body = resource.body.clone();
+        if body.len() < 1 {
+            return;
+        }
+        let body1: Value = serde_json::from_str(&body).unwrap();
+        body = serde_json::to_string_pretty(&body1).unwrap();
+
+        let colored_text = syntax_highlighting(ui.ctx(), &body);
+
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .show(ui, |ui| {
+                egui::CollapsingHeader::new("Response headers")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        egui::Grid::new("response_headers")
+                            .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
+                            .show(ui, |ui| {
+                                for (key, value) in &resource.headers {
+                                    ui.label(key);
+                                    ui.label(value);
+                                    ui.end_row();
+                                }
+                            })
+                    });
+
+                ui.separator();
+
+                let tooltip = "Click to copy the response body";
+                if ui.button("📋").on_hover_text(tooltip).clicked() {
+                    ui.output().copied_text = body.clone();
+                }
+                ui.separator();
+
+                if let Some(colored_text) = colored_text {
+                    colored_text.ui(ui);
+                } else if let Some(text) = Some(&body) {
+                    selectable_text(ui, text);
+                } else {
+                    ui.monospace("[binary]");
+                }
+            });
     }
-    let body1: Value = serde_json::from_str(&body).unwrap();
-    body = serde_json::to_string_pretty(&body1).unwrap();
-
-    let colored_text = syntax_highlighting(ui.ctx(), &body);
-
-    egui::ScrollArea::vertical()
-        .auto_shrink([false; 2])
-        .show(ui, |ui| {
-            egui::CollapsingHeader::new("Response headers")
-                .default_open(false)
-                .show(ui, |ui| {
-                    egui::Grid::new("response_headers")
-                        .spacing(egui::vec2(ui.spacing().item_spacing.x * 2.0, 0.0))
-                        .show(ui, |ui| {
-                            for (key, value) in &resource.headers {
-                                ui.label(key);
-                                ui.label(value);
-                                ui.end_row();
-                            }
-                        })
-                });
-
-            ui.separator();
-
-            let tooltip = "Click to copy the response body";
-            if ui.button("📋").on_hover_text(tooltip).clicked() {
-                ui.output().copied_text = body.clone();
-            }
-            ui.separator();
-
-            if let Some(colored_text) = colored_text {
-                colored_text.ui(ui);
-            } else if let Some(text) = Some(&body) {
-                selectable_text(ui, text);
-            } else {
-                ui.monospace("[binary]");
-            }
-        });
 }
 
 fn selectable_text(ui: &mut egui::Ui, mut text: &str) {
