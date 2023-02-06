@@ -1,3 +1,3 @@
-# restorient
+# reston
 
-An open-source, cross-platform and native API client for APIs, built with rust.
+A lightweight and blazing fast, cross-platform and native API client for APIs, built with rust.

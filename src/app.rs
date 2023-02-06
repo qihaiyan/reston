@@ -5,7 +5,7 @@ use eframe::egui;
 use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
-use egui_dock::{DockArea, TabViewer};
+use egui_dock::{DockArea, StyleBuilder, TabViewer};
 use serde_json::Value;
 
 use ureq::{OrAnyStatus, Response, Transport};
@@ -593,7 +593,7 @@ impl eframe::App for HttpApp {
                 ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
                     ui.add(egui::Hyperlink::from_label_and_url(
                         egui::RichText::new("Feedback").text_style(egui::TextStyle::Monospace),
-                        "https://github.com/qihaiyan/restorient",
+                        "https://github.com/qihaiyan/reston",
                     ));
                 });
             });
@@ -771,7 +771,13 @@ impl eframe::App for HttpApp {
                 });
             });
 
-        DockArea::new(&mut self.tree).show(ctx, &mut self.context);
+        DockArea::new(&mut self.tree)
+            .style(
+                StyleBuilder::from_egui(ctx.style().as_ref())
+                    .show_add_buttons(true)
+                    .build(),
+            )
+            .show(ctx, &mut self.context);
     }
 
     #[cfg(target_arch = "wasm32")]

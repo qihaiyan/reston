@@ -1,5 +1,5 @@
 [package]
-name = "restorient"
+name = "reston"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -17,6 +17,7 @@ image = "0.24"
 
 # feature "http":
 ureq = { version = "2.6.2", features = ["json"] }
+url = { version = "2", features = ["serde"] }
 #reqwest = { version = "0.11", features = ["blocking", "json"] }
 
 rfd = "0.10"

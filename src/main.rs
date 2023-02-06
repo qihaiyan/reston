@@ -22,9 +22,9 @@ fn main() {
         ..Default::default()
     };
     eframe::run_native(
-        "RestOrient",
+        "Reston",
         options,
-        Box::new(|_cc| Box::new(restorient::HttpApp::new(_cc))),
+        Box::new(|_cc| Box::new(reston::HttpApp::new(_cc))),
     );
 }
 
