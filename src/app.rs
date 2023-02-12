@@ -252,7 +252,7 @@ impl Hash for Color {
 struct MyContext<'a> {
     api_collection: &'a mut ApiCollection,
     // name: String,
-    reqest_editor: RequestEditor,
+    reqest_editor: &'a mut RequestEditor,
     // #[serde(skip)]
     sender: &'a mpsc::Sender<Resource>,
     // #[serde(skip)]
@@ -349,9 +349,9 @@ impl TabViewer for MyContext<'_> {
                 }
 
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Params, "Params");
-                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Body, "Body");
-                    ui.selectable_value(&mut self.reqest_editor, RequestEditor::Headers, "Headers");
+                    ui.selectable_value(self.reqest_editor, RequestEditor::Params, "Params");
+                    ui.selectable_value(self.reqest_editor, RequestEditor::Body, "Body");
+                    ui.selectable_value(self.reqest_editor, RequestEditor::Headers, "Headers");
                 });
 
                 match self.reqest_editor {
@@ -543,6 +543,7 @@ pub struct HttpApp {
     search: String,
     tree: egui_dock::Tree<String>,
     api_collection: ApiCollection,
+    reqest_editor: RequestEditor,
     #[serde(skip)]
     sender: mpsc::Sender<Resource>,
     #[serde(skip)]
@@ -568,6 +569,7 @@ impl Default for HttpApp {
             directory: BTreeMap::default(),
             tree: Default::default(),
             api_collection: Default::default(),
+            reqest_editor: Default::default(),
             sender,
             receiver,
             // context: MyContext::default(),
@@ -815,7 +817,7 @@ impl eframe::App for HttpApp {
                 &mut MyContext {
                     api_collection: &mut self.api_collection,
                     // name: String,
-                    reqest_editor: Default::default(),
+                    reqest_editor: &mut self.reqest_editor,
                     // #[serde(skip)]
                     sender: &self.sender,
                     // #[serde(skip)]

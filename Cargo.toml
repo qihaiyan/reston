@@ -20,9 +20,9 @@ ureq = { version = "2.6.2", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 #reqwest = { version = "0.11", features = ["blocking", "json"] }
 
-rfd = "0.10"
+rfd = "0.11"
 zip = "0.6"
-openapiv3 = "1.0.2"
+openapiv3 = "1.0"
 
 syntect = { version = "5", default-features = false, features = [
     "parsing", "default-themes",
