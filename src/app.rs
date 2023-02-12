@@ -5,7 +5,7 @@ use eframe::egui;
 use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
-use egui_dock::{DockArea, StyleBuilder, TabViewer};
+use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
 use serde_json::Value;
 
 use ureq::{OrAnyStatus, Response, Transport};
@@ -247,32 +247,36 @@ impl Hash for Color {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-struct MyContext {
-    api_collection: ApiCollection,
-    name: String,
+// #[derive(serde::Deserialize, serde::Serialize)]
+// #[serde(default)]
+struct MyContext<'a> {
+    api_collection: &'a mut ApiCollection,
+    // name: String,
     reqest_editor: RequestEditor,
-    #[serde(skip)]
-    sender: mpsc::Sender<Resource>,
-    #[serde(skip)]
-    receiver: mpsc::Receiver<Resource>,
+    // #[serde(skip)]
+    sender: &'a mpsc::Sender<Resource>,
+    // #[serde(skip)]
+    receiver: &'a mpsc::Receiver<Resource>,
+    // #[serde(skip)]
+    added_nodes: &'a mut Vec<Location>,
 }
 
-impl Default for MyContext {
-    fn default() -> Self {
-        let (sender, receiver) = mpsc::channel();
-        Self {
-            api_collection: Default::default(),
-            name: "".to_string(),
-            reqest_editor: Default::default(),
-            sender,
-            receiver,
-        }
-    }
-}
+// impl Default for MyContext<'_> {
+//     fn default() -> Self {
+//         let mut nodes:Vec<NodeIndex> = Vec::new();
+//         let (sender, receiver) = mpsc::channel();
+//         Self {
+//             api_collection: Default::default(),
+//             name: "".to_string(),
+//             reqest_editor: Default::default(),
+//             sender,
+//             receiver,
+//             added_nodes: &mut nodes,
+//         }
+//     }
+// }
 
-impl TabViewer for MyContext {
+impl TabViewer for MyContext<'_> {
     type Tab = String;
 
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
@@ -502,8 +506,32 @@ impl TabViewer for MyContext {
     }
 
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
-        let name = &self.api_collection.buffers.get_mut(tab).unwrap().name;
+        let mut location = Location::default();
+        let name = &self
+            .api_collection
+            .buffers
+            .get_mut(tab)
+            .unwrap_or_else(|| &mut location)
+            .name;
         egui::WidgetText::from(name)
+    }
+
+    fn on_add(&mut self, _node: NodeIndex) {
+        let id = Uuid::new_v4().to_string();
+        let location: Location = Location {
+            id: id.clone(),
+            name: ("Item get".into()),
+            url: ("https://httpbin.org/get".into()),
+            params: (Vec::new()),
+            body: ("".into()),
+            header: (vec![("".to_owned(), "".to_owned())]),
+            content_type: ContentType::Json,
+            form_params: Vec::new(),
+            method: Method::Get,
+            response: Default::default(),
+        };
+        self.api_collection.buffers.insert(id, location.clone());
+        self.added_nodes.push(location);
     }
 }
 
@@ -514,7 +542,12 @@ pub struct HttpApp {
     directory: BTreeMap<String, Directory>,
     search: String,
     tree: egui_dock::Tree<String>,
-    context: MyContext,
+    api_collection: ApiCollection,
+    #[serde(skip)]
+    sender: mpsc::Sender<Resource>,
+    #[serde(skip)]
+    receiver: mpsc::Receiver<Resource>,
+    // context: MyContext<'a>,
     picked_path: Option<String>,
     #[serde(skip)]
     show_confirmation_dialog: bool,
@@ -528,12 +561,16 @@ pub struct HttpApp {
 
 impl Default for HttpApp {
     fn default() -> Self {
+        let (sender, receiver) = mpsc::channel();
         Self {
             darkmode: true,
             search: "".to_owned(),
             directory: BTreeMap::default(),
             tree: Default::default(),
-            context: MyContext::default(),
+            api_collection: Default::default(),
+            sender,
+            receiver,
+            // context: MyContext::default(),
             picked_path: Default::default(),
             show_confirmation_dialog: false,
             dir_rename: Default::default(),
@@ -676,8 +713,7 @@ impl eframe::App for HttpApp {
                                             method: Method::from_text(item.request.method),
                                             response: Default::default(),
                                         };
-                                        self.context
-                                            .api_collection
+                                        self.api_collection
                                             .buffers
                                             .insert(item.id.clone(), location.clone());
                                     }
@@ -709,10 +745,7 @@ impl eframe::App for HttpApp {
                                     response: Default::default(),
                                 };
                                 dir.1.locations.push(id.clone());
-                                self.context
-                                    .api_collection
-                                    .buffers
-                                    .insert(id, location.clone());
+                                self.api_collection.buffers.insert(id, location.clone());
                             };
                             if ui.button("del").clicked() {
                                 dir_del = dir.0.clone();
@@ -728,7 +761,6 @@ impl eframe::App for HttpApp {
                                     let is_open = tab_location.is_some();
                                     ui.horizontal(|ui| {
                                         let name = self
-                                            .context
                                             .api_collection
                                             .buffers
                                             .get(id)
@@ -771,13 +803,31 @@ impl eframe::App for HttpApp {
                 });
             });
 
+        let mut added_nodes = Vec::new();
         DockArea::new(&mut self.tree)
             .style(
                 StyleBuilder::from_egui(ctx.style().as_ref())
                     .show_add_buttons(true)
                     .build(),
             )
-            .show(ctx, &mut self.context);
+            .show(
+                ctx,
+                &mut MyContext {
+                    api_collection: &mut self.api_collection,
+                    // name: String,
+                    reqest_editor: Default::default(),
+                    // #[serde(skip)]
+                    sender: &self.sender,
+                    // #[serde(skip)]
+                    receiver: &self.receiver,
+                    // #[serde(skip)]
+                    added_nodes: &mut added_nodes,
+                },
+            );
+        added_nodes.drain(..).for_each(|node| {
+            // self.tree.set_focused_node(node);
+            self.tree.push_to_focused_leaf(node.id);
+        });
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -859,7 +909,7 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
 
                 let tooltip = "Click to copy the response body";
                 if ui.button("📋").on_hover_text(tooltip).clicked() {
-                    ui.output().copied_text = body.clone();
+                    ui.output_mut(|u| u.copied_text = body.clone());
                 }
                 ui.separator();
 
@@ -893,9 +943,9 @@ impl ColoredText {
         if true {
             // Selectable text:
             let mut layouter = |ui: &egui::Ui, _string: &str, wrap_width: f32| {
-                let mut layout_job = self.0.clone();
-                layout_job.wrap.max_width = wrap_width;
-                ui.fonts().layout_job(layout_job)
+                let mut job = self.0.clone();
+                job.wrap.max_width = wrap_width;
+                ui.fonts(|f| f.layout_job(job))
             };
 
             let mut text = self.0.text.as_str();
@@ -908,7 +958,7 @@ impl ColoredText {
         } else {
             let mut job = self.0.clone();
             job.wrap.max_width = ui.available_width();
-            let galley = ui.fonts().layout_job(job);
+            let galley = ui.fonts(|f| f.layout_job(job));
             let (response, painter) = ui.allocate_painter(galley.size(), egui::Sense::hover());
             painter.add(egui::Shape::galley(response.rect.min, galley));
         }

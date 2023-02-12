@@ -10,9 +10,7 @@ pub fn highlight(ctx: &egui::Context, code: &str) -> LayoutJob {
 
     type HighlightCache = egui::util::cache::FrameCache<LayoutJob, Highlighter>;
 
-    let mut memory = ctx.memory();
-    let highlight_cache = memory.caches.cache::<HighlightCache>();
-    highlight_cache.get(code)
+    ctx.memory_mut(|mem| mem.caches.cache::<HighlightCache>().get(code))
 }
 struct Highlighter {
     ps: syntect::parsing::SyntaxSet,

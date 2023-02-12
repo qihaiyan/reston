@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() {
+fn main() -> Result<(), eframe::Error> {
     use eframe::{IconData, Theme};
 
     let icon_bytes = include_bytes!("../orient.png");
@@ -25,7 +25,7 @@ fn main() {
         "Reston",
         options,
         Box::new(|_cc| Box::new(reston::HttpApp::new(_cc))),
-    );
+    )
 }
 
 #[cfg(target_arch = "wasm32")]
