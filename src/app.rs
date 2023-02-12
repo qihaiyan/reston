@@ -9,6 +9,7 @@ use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
 use serde_json::Value;
 
 use ureq::{OrAnyStatus, Response, Transport};
+use url::Url;
 use uuid::Uuid;
 
 use crate::syntax_highlighting;
@@ -247,34 +248,13 @@ impl Hash for Color {
     }
 }
 
-// #[derive(serde::Deserialize, serde::Serialize)]
-// #[serde(default)]
 struct MyContext<'a> {
     api_collection: &'a mut ApiCollection,
-    // name: String,
     reqest_editor: &'a mut RequestEditor,
-    // #[serde(skip)]
     sender: &'a mpsc::Sender<Resource>,
-    // #[serde(skip)]
     receiver: &'a mpsc::Receiver<Resource>,
-    // #[serde(skip)]
     added_nodes: &'a mut Vec<Location>,
 }
-
-// impl Default for MyContext<'_> {
-//     fn default() -> Self {
-//         let mut nodes:Vec<NodeIndex> = Vec::new();
-//         let (sender, receiver) = mpsc::channel();
-//         Self {
-//             api_collection: Default::default(),
-//             name: "".to_string(),
-//             reqest_editor: Default::default(),
-//             sender,
-//             receiver,
-//             added_nodes: &mut nodes,
-//         }
-//     }
-// }
 
 impl TabViewer for MyContext<'_> {
     type Tab = String;
@@ -302,13 +282,13 @@ impl TabViewer for MyContext<'_> {
                     thread::spawn(move || {
                         let resource = Resource::from_response(match resource_location.method {
                             Method::Get => {
-                                let params = resource_location
-                                    .params
-                                    .iter()
-                                    .filter(|e| (e.0.is_empty() == false));
-                                for e in params {
-                                    request = request.query(&e.0, &e.1);
-                                }
+                                // let params = resource_location
+                                //     .params
+                                //     .iter()
+                                //     .filter(|e| (e.0.is_empty() == false));
+                                // for e in params {
+                                //     request = request.query(&e.0, &e.1);
+                                // }
                                 request.call().or_any_status()
                             }
                             Method::Post => match resource_location.content_type {
@@ -381,8 +361,21 @@ impl TabViewer for MyContext<'_> {
 
                                 let mut i = 0 as usize;
                                 while i < location.params.len() {
-                                    ui.add(egui::TextEdit::singleline(&mut location.params[i].0));
-                                    ui.add(egui::TextEdit::singleline(&mut location.params[i].1));
+                                    // if ui.text_edit_singleline(&mut location.params[i].0).changed()
+                                    // {
+                                    //     let url = Url::parse(&location.url);
+                                    //     if url.is_ok() {
+                                    //         location.params.drain(..);
+                                    //         url.ok().unwrap().query_pairs().for_each(|q| {
+                                    //             location.params.push((
+                                    //                 q.0.to_string().clone(),
+                                    //                 q.1.to_string().clone(),
+                                    //             ));
+                                    //         })
+                                    //     }
+                                    // };
+                                    ui.text_edit_singleline(&mut location.params[i].0);
+                                    ui.text_edit_singleline(&mut location.params[i].1);
                                     if ui.button("del").clicked() {
                                         location.params.remove(i);
                                     }
@@ -841,7 +834,7 @@ impl eframe::App for HttpApp {
 fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
     let mut trigger_fetch = false;
 
-    ui.add(egui::TextEdit::singleline(&mut location.name));
+    ui.text_edit_singleline(&mut location.name);
     ui.separator();
 
     ui.horizontal(|ui| {
@@ -856,7 +849,28 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 ui.selectable_value(&mut location.method, Method::Head, "Head");
             });
 
-        ui.text_edit_singleline(&mut location.url);
+        if (ui.text_edit_singleline(&mut location.url)).changed() {
+            let url = Url::parse(&location.url);
+            if url.is_ok() {
+                location.params.drain(..);
+                url.ok().unwrap().query_pairs().for_each(|q| {
+                    location
+                        .params
+                        .push((q.0.to_string().clone(), q.1.to_string().clone()));
+                })
+            }
+        };
+
+        let url = Url::parse(&location.url);
+        if url.is_ok() {
+            let mut url = url.ok().unwrap();
+            url.query_pairs_mut().clear();
+            location.params.clone().into_iter().for_each(|p| {
+                url.query_pairs_mut().append_pair(&p.0, &p.1);
+            });
+
+            location.url = url.to_string();
+        }
 
         if ui.button("Go").clicked() {
             trigger_fetch = true;
