@@ -899,7 +899,7 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
         if body.len() < 1 {
             return;
         }
-        let body1: Value = serde_json::from_str(&body).unwrap();
+        let body1: Value = serde_json::from_str(&body).unwrap_or_default();
         body = serde_json::to_string_pretty(&body1).unwrap();
 
         let colored_text = syntax_highlighting(ui.ctx(), &body);
