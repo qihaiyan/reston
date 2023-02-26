@@ -849,7 +849,10 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 ui.selectable_value(&mut location.method, Method::Head, "Head");
             });
 
-        if (ui.text_edit_singleline(&mut location.url)).changed() {
+        if ui
+            .add(egui::TextEdit::singleline(&mut location.url).desired_width(800.0))
+            .changed()
+        {
             if location.url.ends_with("&") {
                 if !location.params.contains(&("".to_string(), "".to_string())) {
                     location.params.push(("".to_string(), "".to_string()));
