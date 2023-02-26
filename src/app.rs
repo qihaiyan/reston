@@ -850,28 +850,46 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
             });
 
         if (ui.text_edit_singleline(&mut location.url)).changed() {
-            let url = Url::parse(&location.url);
-            if url.is_ok() {
-                location.params.drain(..);
-                url.ok().unwrap().query_pairs().for_each(|q| {
-                    location
-                        .params
-                        .push((q.0.to_string().clone(), q.1.to_string().clone()));
-                })
+            if location.url.ends_with("&") {
+                if !location.params.contains(&("".to_string(), "".to_string())) {
+                    location.params.push(("".to_string(), "".to_string()));
+                }
+            } else {
+                let url = Url::parse(&location.url);
+                if url.is_ok() {
+                    location.params.drain(..);
+                    url.ok().unwrap().query_pairs().for_each(|q| {
+                        location
+                            .params
+                            .push((q.0.to_string().clone(), q.1.to_string().clone()));
+                    })
+                }
             }
-        };
-
+        }
         let url = Url::parse(&location.url);
         if url.is_ok() {
             let mut url = url.ok().unwrap();
             url.query_pairs_mut().clear();
             location.params.clone().into_iter().for_each(|p| {
-                url.query_pairs_mut().append_pair(&p.0, &p.1);
+                if p.0.len() > 0 {
+                    url.query_pairs_mut().append_pair(&p.0, &p.1);
+                }
             });
 
-            location.url = url.to_string();
+            if location.url.ends_with("&") {
+                location.url = url_escape::decode(&url).to_string() + "&";
+            } else {
+                location.url = url_escape::decode(&url).to_string();
+            }
         }
 
+        // let parsed = Url::parse(&location.url).unwrap();
+        // let url: &str = &parsed[..url::Position::AfterPath];
+        // let mut request = ureq::request("get", url);
+        // for e in &location.params {
+        //     request = request.query(&e.0, &e.1);
+        // }
+        // location.url = request.url().to_string();
         if ui.button("Go").clicked() {
             trigger_fetch = true;
         }
