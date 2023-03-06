@@ -1,4 +1,5 @@
 use std::hash::{Hash, Hasher};
+use std::time::Duration;
 use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use eframe::egui;
@@ -248,12 +249,17 @@ impl Hash for Color {
     }
 }
 
+enum RunState {
+    Running,
+}
+
 struct MyContext<'a> {
     api_collection: &'a mut ApiCollection,
     reqest_editor: &'a mut RequestEditor,
     sender: &'a mpsc::Sender<Resource>,
     receiver: &'a mpsc::Receiver<Resource>,
     added_nodes: &'a mut Vec<Location>,
+    run_state: &'a mut Vec<RunState>,
 }
 
 impl TabViewer for MyContext<'_> {
@@ -269,7 +275,9 @@ impl TabViewer for MyContext<'_> {
                 let trigger_fetch = ui_url(ui, location);
 
                 if trigger_fetch {
-                    let mut request = ureq::request(&location.method.to_text(), &location.url);
+                    self.run_state.push(RunState::Running);
+
+                    let mut request = ureq::request(&location.method.to_text(), &location.url).timeout(Duration::from_secs(10));
 
                     let headers = location.header.iter().filter(|e| (e.0.is_empty() == false));
                     for e in headers {
@@ -323,8 +331,15 @@ impl TabViewer for MyContext<'_> {
                     });
                 }
 
+                if self.run_state.len() > 0 {
+                    ui.spinner();
+                }
+
                 match self.receiver.try_recv() {
-                    Ok(resource) => location.response = Some(resource),
+                    Ok(resource) => {
+                        location.response = Some(resource);
+                        self.run_state.clear();
+                    }
                     Err(_) => {}
                 }
 
@@ -551,6 +566,8 @@ pub struct HttpApp {
     items: Vec<Color>,
     #[serde(skip)]
     preview: Option<Vec<Color>>,
+    #[serde(skip)]
+    run_state: Vec<RunState>,
 }
 
 impl Default for HttpApp {
@@ -584,6 +601,7 @@ impl Default for HttpApp {
                 },
             ],
             preview: None,
+            run_state: Default::default(),
         }
     }
 }
@@ -817,6 +835,7 @@ impl eframe::App for HttpApp {
                     receiver: &self.receiver,
                     // #[serde(skip)]
                     added_nodes: &mut added_nodes,
+                    run_state: &mut self.run_state,
                 },
             );
         added_nodes.drain(..).for_each(|node| {
