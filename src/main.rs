@@ -4,7 +4,7 @@
 fn main() -> Result<(), eframe::Error> {
     use eframe::{IconData, Theme};
 
-    let icon_bytes = include_bytes!("../orient.png");
+    let icon_bytes = include_bytes!("../reston.png");
     let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
     let (icon_width, icon_height) = icon.dimensions();
     let options = eframe::NativeOptions {

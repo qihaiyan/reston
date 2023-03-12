@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
+
 [dependencies]
 egui = { version = "0.21.0", features = ["color-hex"] }
 #eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
