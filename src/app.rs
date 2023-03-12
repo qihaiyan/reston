@@ -3,6 +3,7 @@ use std::time::Duration;
 use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use eframe::egui;
+use egui::collapsing_header::CollapsingState;
 use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
@@ -744,7 +745,17 @@ impl eframe::App for HttpApp {
                     });
 
                     let mut dir_del = "".to_owned();
-                    for dir in self.directory.iter_mut() {
+                    let ac = self.api_collection.clone();
+                    for dir in self.directory.iter_mut().filter(|x| {
+                        ac.buffers
+                            .iter()
+                            .any(|d| x.1.locations.contains(&d.0) && d.1.url.contains(&self.search))
+                    })
+                    // .get(x.1.locations)
+                    // .unwrap()
+                    // .url
+                    // .contains(&self.search))
+                    {
                         ui.horizontal(|ui| {
                             if ui.button("add").clicked() {
                                 let id = Uuid::new_v4().to_string();
@@ -770,32 +781,63 @@ impl eframe::App for HttpApp {
                                 self.dir_rename = dir.0.clone();
                                 self.show_confirmation_dialog = true;
                             };
-                            ui.collapsing(dir.1.name.clone(), |ui| {
-                                let mut localtion_del = "".to_owned();
-                                for id in &dir.1.locations {
-                                    let tab_location = self.tree.find_tab(&id);
-                                    let is_open = tab_location.is_some();
-                                    ui.horizontal(|ui| {
-                                        let name = self
-                                            .api_collection
-                                            .buffers
-                                            .get(id)
-                                            .unwrap()
-                                            .name
-                                            .clone();
-                                        if ui.selectable_label(is_open, name).clicked() {
-                                            if let Some((node_index, tab_index)) = tab_location {
-                                                self.tree.set_active_tab(node_index, tab_index);
-                                            } else {
-                                                self.tree.push_to_focused_leaf(id.clone());
-                                            }
+                            ui.vertical(|ui| {
+                                let mut collapsing_state = CollapsingState::load_with_default_open(
+                                    ui.ctx(),
+                                    ui.make_persistent_id(dir.0.clone()),
+                                    false,
+                                );
+                                collapsing_state.set_open(!self.search.is_empty());
+                                collapsing_state
+                                    .show_header(ui, |ui| ui.label(dir.1.name.clone()))
+                                    // .default_open(!self.search.is_empty())
+                                    .body(|ui| {
+                                        // ui.collapsing(dir.1.name.clone(), |ui| {
+                                        let mut localtion_del = "".to_owned();
+                                        for id in dir.1.locations.clone().into_iter().filter(|x| {
+                                            self.api_collection
+                                                .buffers
+                                                .get(x)
+                                                .unwrap()
+                                                .url
+                                                .contains(&self.search)
+                                        }) {
+                                            let tab_location = self.tree.find_tab(&id);
+                                            let is_open = tab_location.is_some();
+                                            ui.horizontal(|ui| {
+                                                // if self
+                                                //     .api_collection
+                                                //     .buffers
+                                                //     .get(&id)
+                                                //     .unwrap()
+                                                //     .url
+                                                //     .contains(&self.search)
+                                                // {
+                                                let name = self
+                                                    .api_collection
+                                                    .buffers
+                                                    .get(&id)
+                                                    .unwrap()
+                                                    .name
+                                                    .clone();
+                                                if ui.selectable_label(is_open, name).clicked() {
+                                                    if let Some((node_index, tab_index)) =
+                                                        tab_location
+                                                    {
+                                                        self.tree
+                                                            .set_active_tab(node_index, tab_index);
+                                                    } else {
+                                                        self.tree.push_to_focused_leaf(id.clone());
+                                                    }
+                                                }
+                                                if ui.button("del").clicked() {
+                                                    localtion_del = id.to_owned();
+                                                };
+                                                // }
+                                            });
                                         }
-                                        if ui.button("del").clicked() {
-                                            localtion_del = id.to_owned();
-                                        };
-                                    });
-                                }
-                                dir.1.locations.retain(|v| v != &localtion_del)
+                                        dir.1.locations.retain(|v| v != &localtion_del)
+                                    })
                             });
                         });
                     }
