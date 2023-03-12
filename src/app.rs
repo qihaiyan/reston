@@ -267,7 +267,7 @@ impl TabViewer for MyContext<'_> {
 
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         Frame::none()
-            .inner_margin(Margin::same(2.0))
+            .inner_margin(Margin::same(10.0))
             .show(ui, |ui| {
                 let mut add_location = false;
                 let location = self.api_collection.buffers.get_mut(tab).unwrap();
@@ -277,7 +277,8 @@ impl TabViewer for MyContext<'_> {
                 if trigger_fetch {
                     self.run_state.push(RunState::Running);
 
-                    let mut request = ureq::request(&location.method.to_text(), &location.url).timeout(Duration::from_secs(10));
+                    let mut request = ureq::request(&location.method.to_text(), &location.url)
+                        .timeout(Duration::from_secs(10));
 
                     let headers = location.header.iter().filter(|e| (e.0.is_empty() == false));
                     for e in headers {
@@ -820,6 +821,7 @@ impl eframe::App for HttpApp {
         DockArea::new(&mut self.tree)
             .style(
                 StyleBuilder::from_egui(ctx.style().as_ref())
+                    .with_tab_bar_height(40.0)
                     .show_add_buttons(true)
                     .build(),
             )
