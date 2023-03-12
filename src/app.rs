@@ -787,7 +787,9 @@ impl eframe::App for HttpApp {
                                     ui.make_persistent_id(dir.0.clone()),
                                     false,
                                 );
-                                collapsing_state.set_open(!self.search.is_empty());
+                                if !self.search.is_empty() {
+                                    collapsing_state.set_open(true);
+                                }
                                 collapsing_state
                                     .show_header(ui, |ui| ui.label(dir.1.name.clone()))
                                     // .default_open(!self.search.is_empty())
