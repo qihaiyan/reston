@@ -77,6 +77,7 @@ enum Method {
     Put,
     Patch,
     Delete,
+    Options,
     Head,
 }
 
@@ -94,6 +95,7 @@ impl Method {
             Method::Put => "PUT".to_owned(),
             Method::Patch => "PATCH".to_owned(),
             Method::Delete => "DELETE".to_owned(),
+            Method::Options => "OPTIONS".to_owned(),
             Method::Head => "HEAD".to_owned(),
         }
     }
@@ -867,6 +869,7 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 ui.selectable_value(&mut location.method, Method::Put, "Put");
                 ui.selectable_value(&mut location.method, Method::Patch, "Patch");
                 ui.selectable_value(&mut location.method, Method::Delete, "Delete");
+                ui.selectable_value(&mut location.method, Method::Options, "Options");
                 ui.selectable_value(&mut location.method, Method::Head, "Head");
             });
 
@@ -937,15 +940,6 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
 
         ui.separator();
 
-        let mut body = resource.body.clone();
-        if body.len() < 1 {
-            return;
-        }
-        let body1: Value = serde_json::from_str(&body).unwrap_or_default();
-        body = serde_json::to_string_pretty(&body1).unwrap();
-
-        let colored_text = syntax_highlighting(ui.ctx(), &body);
-
         egui::ScrollArea::vertical()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
@@ -964,6 +958,14 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
                     });
 
                 ui.separator();
+
+                let mut body = resource.body.clone();
+                if body.len() < 1 {
+                    return;
+                }
+                let body1: Value = serde_json::from_str(&body).unwrap_or_default();
+                body = serde_json::to_string_pretty(&body1).unwrap();
+                let colored_text = syntax_highlighting(ui.ctx(), &body);
 
                 let tooltip = "Click to copy the response body";
                 if ui.button("📋").on_hover_text(tooltip).clicked() {
