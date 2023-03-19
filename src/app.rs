@@ -11,10 +11,10 @@ use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
 use serde_json::Value;
 
 use ureq::{OrAnyStatus, Response, Transport};
-use url::Url;
 use uuid::Uuid;
 
 use crate::syntax_highlighting;
+use crate::url_parser::URL;
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -926,33 +926,32 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                     location.params.push(("".to_string(), "".to_string()));
                 }
             } else {
-                let url = Url::parse(&location.url);
-                if url.is_ok() {
+                let urlstr = location.url.clone();
+                let url = URL::parse(&urlstr).unwrap();
                     location.params.drain(..);
-                    url.ok().unwrap().query_pairs().for_each(|q| {
-                        location
-                            .params
-                            .push((q.0.to_string().clone(), q.1.to_string().clone()));
-                    })
-                }
+                    // url.query_pairs.into_iter().for_each(|q| {
+                    //     location
+                    //         .params
+                    //         .push((q.0.to_string().clone(), q.1.to_string().clone()));
+                    // })
             }
         }
-        let url = Url::parse(&location.url);
-        if url.is_ok() {
-            let mut url = url.ok().unwrap();
-            url.query_pairs_mut().clear();
-            location.params.clone().into_iter().for_each(|p| {
-                if p.0.len() > 0 {
-                    url.query_pairs_mut().append_pair(&p.0, &p.1);
-                }
-            });
+        // let url = URL::parse(&location.url);
+        // if url.is_ok() {
+        //     let mut url = url.ok().unwrap();
+        //     url.query_pairs_mut().clear();
+        //     location.params.clone().into_iter().for_each(|p| {
+        //         if p.0.len() > 0 {
+        //             url.query_pairs_mut().append_pair(&p.0, &p.1);
+        //         }
+        //     });
 
-            if location.url.ends_with("&") {
-                location.url = url_escape::decode(&url).to_string() + "&";
-            } else {
-                location.url = url_escape::decode(&url).to_string();
-            }
-        }
+        //     if location.url.ends_with("&") {
+        //         location.url = url_escape::decode(&url).to_string() + "&";
+        //     } else {
+        //         location.url = url_escape::decode(&url).to_string();
+        //     }
+        // }
 
         // let parsed = Url::parse(&location.url).unwrap();
         // let url: &str = &parsed[..url::Position::AfterPath];
