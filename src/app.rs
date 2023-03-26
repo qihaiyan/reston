@@ -13,8 +13,7 @@ use serde_json::Value;
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::syntax_highlighting;
-use crate::url_parser::URL;
+use crate::{syntax_highlighting, uri};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -380,23 +379,97 @@ impl TabViewer for MyContext<'_> {
 
                                 let mut i = 0 as usize;
                                 while i < location.params.len() {
-                                    // if ui.text_edit_singleline(&mut location.params[i].0).changed()
-                                    // {
-                                    //     let url = Url::parse(&location.url);
-                                    //     if url.is_ok() {
-                                    //         location.params.drain(..);
-                                    //         url.ok().unwrap().query_pairs().for_each(|q| {
-                                    //             location.params.push((
-                                    //                 q.0.to_string().clone(),
-                                    //                 q.1.to_string().clone(),
-                                    //             ));
-                                    //         })
-                                    //     }
-                                    // };
-                                    ui.text_edit_singleline(&mut location.params[i].0);
-                                    ui.text_edit_singleline(&mut location.params[i].1);
+                                    if ui.text_edit_singleline(&mut location.params[i].0).changed()
+                                    {
+                                        let urlstr = location.url.clone();
+                                        let url = uri(&urlstr);
+                                        if url.is_ok() {
+                                            let mut url = url.ok().unwrap().1;
+                                            if url.query.is_some() {
+                                                url.query.as_mut().unwrap().clear();
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            } else {
+                                                url.query = Some(vec![]);
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            }
+                                            location.url = url.to_string();
+                                        }
+                                    };
+                                    if ui.text_edit_singleline(&mut location.params[i].1).changed()
+                                    {
+                                        let urlstr = location.url.clone();
+                                        let url = uri(&urlstr);
+                                        if url.is_ok() {
+                                            let mut url = url.ok().unwrap().1;
+                                            if url.query.is_some() {
+                                                url.query.as_mut().unwrap().clear();
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            } else {
+                                                url.query = Some(vec![]);
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            }
+                                            location.url = url.to_string();
+                                        }
+                                    };
+                                    // ui.text_edit_singleline(&mut location.params[i].0);
+                                    // ui.text_edit_singleline(&mut location.params[i].1);
                                     if ui.button("del").clicked() {
                                         location.params.remove(i);
+                                        let urlstr = location.url.clone();
+                                        let url = uri(&urlstr);
+                                        if url.is_ok() {
+                                            let mut url = url.ok().unwrap().1;
+                                            if url.query.is_some() {
+                                                url.query.as_mut().unwrap().clear();
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            } else {
+                                                url.query = Some(vec![]);
+                                                location.params.iter().for_each(|p| {
+                                                    if p.0.len() > 0 {
+                                                        url.query
+                                                            .as_mut()
+                                                            .unwrap()
+                                                            .push((&p.0, &p.1));
+                                                    }
+                                                });
+                                            }
+                                            location.url = url.to_string();
+                                        }
                                     }
                                     i = i + 1;
                                     ui.end_row();
@@ -927,15 +1000,60 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 }
             } else {
                 let urlstr = location.url.clone();
-                let url = URL::parse(&urlstr).unwrap();
+                let url = uri(&urlstr);
+                if url.is_ok() {
+                    let url = url.unwrap().1;
                     location.params.drain(..);
-                    // url.query_pairs.into_iter().for_each(|q| {
-                    //     location
-                    //         .params
-                    //         .push((q.0.to_string().clone(), q.1.to_string().clone()));
-                    // })
+                    url.query.unwrap_or_default().into_iter().for_each(|q| {
+                        location
+                            .params
+                            .push((q.0.to_string().clone(), q.1.to_string().clone()));
+                    })
+                }
+                // let req = ParsedRequest::new(req).unwrap();
+                // let url = parse_url(&urlstr);
+                // let url = URL::parse(&urlstr).unwrap();
             }
         }
+        // let urlstr = location.url.clone();
+        // let url = uri(&urlstr);
+        // if url.is_ok() {
+        //     let mut url = url.ok().unwrap().1;
+        //     if url.query.is_some() {
+        //         url.query.as_mut().unwrap().clear();
+        //         location.params.iter().for_each(|p| {
+        //             if p.0.len() > 0 {
+        //                 url.query.as_mut().unwrap().push((&p.0, &p.1));
+        //             }
+        //         });
+        //     } else {
+        //         url.query = Some(vec![]);
+        //         location.params.iter().for_each(|p| {
+        //             if p.0.len() > 0 {
+        //                 url.query.as_mut().unwrap().push((&p.0, &p.1));
+        //             }
+        //         });
+        //     }
+        //     if location.url.ends_with("&") {
+        //         location.url = url.to_string() + "&";
+        //     } else {
+        //         location.url = url.to_string()
+        //     }
+        // }
+        // let urlstr = location.url.clone();
+        // let url = uri(&urlstr);
+        // if url.is_ok() {
+        //     let mut url = url.ok().unwrap().1;
+        //     if url.query.is_some() {
+        //         url.query.as_mut().unwrap().clear();
+        //         location.params.iter().for_each(|p| {
+        //             if p.0.len() > 0 {
+        //                 url.query.as_mut().unwrap().push((&p.0, &p.1));
+        //             }
+        //         });
+        //     }
+        //     location.url = url.to_string();
+        // }
         // let url = URL::parse(&location.url);
         // if url.is_ok() {
         //     let mut url = url.ok().unwrap();
@@ -946,16 +1064,16 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
         //         }
         //     });
 
-        //     if location.url.ends_with("&") {
-        //         location.url = url_escape::decode(&url).to_string() + "&";
-        //     } else {
-        //         location.url = url_escape::decode(&url).to_string();
-        //     }
+        //     // if location.url.ends_with("&") {
+        //     //     location.url = url_escape::decode(&url).to_string() + "&";
+        //     // } else {
+        //     //     location.url = url_escape::decode(&url).to_string();
+        //     // }
         // }
 
         // let parsed = Url::parse(&location.url).unwrap();
         // let url: &str = &parsed[..url::Position::AfterPath];
-        // let mut request = ureq::request("get", url);
+        // let mut request = ureq::request("get", &urlstr);
         // for e in &location.params {
         //     request = request.query(&e.0, &e.1);
         // }
