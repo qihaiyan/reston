@@ -4,6 +4,11 @@ use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
+use font_kit::{
+    family_name::FamilyName,
+    properties::{Properties, Weight},
+    source::SystemSource,
+};
 use serde_json::Value;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
@@ -1198,31 +1203,72 @@ impl ColoredText {
 }
 
 fn setup_custom_fonts(ctx: &egui::Context) {
-    // Start with the default fonts (we will be adding to them rather than replacing them).
     let mut fonts = egui::FontDefinitions::default();
+    let source = SystemSource::new();
+    let prop = if let Ok(font) = source.select_best_match(
+        &[
+            FamilyName::Title("微软雅黑".to_owned()),
+            FamilyName::SansSerif,
+        ],
+        Properties::new().weight(Weight::NORMAL),
+    ) {
+        let font = match font.load() {
+            Ok(font) => font,
+            Err(_err) => {
+                return;
+            }
+        };
+        let Some(font_data) = font.copy_font_data() else {
+            return;
+        };
+        let data = Box::leak((*font_data).clone().into_boxed_slice());
+        data
+    } else {
+        return;
+    };
 
-    // Install my own font (maybe supporting non-latin characters).
-    // .ttf and .otf files supported.
-    fonts.font_data.insert(
-        "my_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("C:/Windows/Fonts/msyh.ttc")),
-    );
-
-    // Put my font first (highest priority) for proportional text:
+    fonts
+        .font_data
+        .insert("prop".to_owned(), egui::FontData::from_static(prop));
     fonts
         .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
-        .insert(0, "my_font".to_owned());
+        .insert(0, "prop".to_owned());
 
-    // Put my font as last fallback for monospace:
+    let mono = if let Ok(font) = source.select_best_match(
+        &[
+            // FamilyName::Title("YaHei Consolas Hybrid".to_owned()),
+            FamilyName::Title("微软雅黑".to_owned()),
+            FamilyName::Title("Consolas".to_owned()),
+            FamilyName::Monospace,
+        ],
+        Properties::new().weight(Weight::NORMAL),
+    ) {
+        let font = match font.load() {
+            Ok(font) => font,
+            Err(_err) => {
+                return;
+            }
+        };
+        let Some(font_data) = font.copy_font_data() else {
+            return;
+        };
+        let data = Box::leak((*font_data).clone().into_boxed_slice());
+        data
+    } else {
+        return;
+    };
+
+    fonts
+        .font_data
+        .insert("mono".to_owned(), egui::FontData::from_static(mono));
+
     fonts
         .families
         .entry(egui::FontFamily::Monospace)
         .or_default()
-        .push("my_font".to_owned());
-
-    // Tell egui to use these fonts:
+        .insert(0, "mono".to_owned());
     ctx.set_fonts(fonts);
 }
 
