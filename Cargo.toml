@@ -11,7 +11,7 @@ winres = "0.1.12"
 egui = { version = "0.21.0", features = ["color-hex"] }
 #eframe = { version = "0.21.3", features = ["dark-light", "persistence"] }
 eframe = { version = "0.21.3", features = ["persistence"] }
-egui_extras = { version = "0.21.0", features = ["svg", "tracing"] }
+# egui_extras = { version = "0.21.0", features = ["svg", "tracing"] }
 egui_dock = { version = "0.4", features = ["serde"] }
 color-hex = "0.2.0"
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
@@ -28,7 +28,7 @@ nom = { version = "7" }
 
 rfd = "0.11"
 zip = "0.6"
-openapiv3 = "1.0"
+# openapiv3 = "1.0"
 
 syntect = { version = "5", default-features = false, features = [
     "parsing", "default-themes",
