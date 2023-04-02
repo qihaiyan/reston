@@ -1,7 +1,3 @@
-use std::hash::{Hash, Hasher};
-use std::time::Duration;
-use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
-
 use eframe::egui;
 use egui::collapsing_header::CollapsingState;
 use egui::{
@@ -9,6 +5,10 @@ use egui::{
 };
 use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
 use serde_json::Value;
+use std::hash::{Hash, Hasher};
+use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
@@ -27,12 +27,13 @@ struct Resource {
     content_type: String,
     status: usize,
     status_text: String,
+    elapsed: u128,
     // If set, the response was text with some supported syntax highlighting (e.g. ".rs" or ".md").
     // colored_text: Option<ColoredText>,
 }
 
 impl Resource {
-    fn from_response(response: Result<Response>) -> Option<Self> {
+    fn from_response(response: Result<Response>, elapsed: u128) -> Option<Self> {
         if let Ok(response) = response {
             let url = response.get_url().to_string();
             let status = response.status().into();
@@ -62,6 +63,7 @@ impl Resource {
                 content_type,
                 status,
                 status_text,
+                elapsed,
             });
         } else {
             return None;
@@ -291,7 +293,11 @@ impl TabViewer for MyContext<'_> {
                     let resource_location = location.clone();
                     let ctx = ui.ctx().clone();
                     thread::spawn(move || {
-                        let resource = Resource::from_response(match resource_location.method {
+                        let start = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis();
+                        let response = match resource_location.method {
                             Method::Get => {
                                 // let params = resource_location
                                 //     .params
@@ -326,7 +332,12 @@ impl TabViewer for MyContext<'_> {
                                 _ => request.call().or_any_status(),
                             },
                             _ => request.call().or_any_status(),
-                        });
+                        };
+                        let stop = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis();
+                        let resource = Resource::from_response(response, stop - start);
                         if let Some(resource) = resource {
                             sender.send(resource).unwrap();
                             ctx.request_repaint();
@@ -1093,12 +1104,12 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
             "status:       {} ({})",
             resource.status, resource.status_text
         ));
-        ui.monospace(format!("content-type: {:?}", resource.content_type));
+        ui.monospace(format!("content-type: {}", resource.content_type));
         ui.monospace(format!(
             "size:         {:.1} kB",
             resource.length as f32 / 1000.0
         ));
-
+        ui.monospace(format!("time:         {} ms", resource.elapsed));
         ui.separator();
 
         egui::ScrollArea::vertical()
