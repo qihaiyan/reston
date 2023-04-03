@@ -32,7 +32,7 @@ impl URI<'_> {
             + &self
                 .path
                 .as_ref()
-                .map_or_else(|| "".to_string(), |v| v.join(""))
+                .map_or_else(|| "".to_string(), |v| "/".to_string() + v.join("").as_str())
             + &self.query.clone().map_or_else(
                 || "".to_string(),
                 |v| {
@@ -192,12 +192,12 @@ fn query_params(input: &str) -> Res<&str, QueryParams> {
             tag("?"),
             url_code_points,
             tag("="),
-            url_code_points,
+            param_code_points,
             many0(tuple((
                 tag("&"),
                 url_code_points,
                 tag("="),
-                url_code_points,
+                param_code_points,
             ))),
         )),
     )(input)
@@ -269,6 +269,22 @@ where
         |item| {
             let char_item = item.as_char();
             !(char_item == '-') && !char_item.is_alphanum() && !(char_item == '.')
+            // ... actual ascii code points and url encoding...: https://infra.spec.whatwg.org/#ascii-code-point
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
+
+fn param_code_points<T>(i: T) -> Res<T, T>
+where
+    T: InputTakeAtPosition,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            // false
+            let char_item = item.as_char();
+           !(char_item != '&')
             // ... actual ascii code points and url encoding...: https://infra.spec.whatwg.org/#ascii-code-point
         },
         ErrorKind::AlphaNumeric,
