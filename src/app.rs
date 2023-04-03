@@ -958,6 +958,7 @@ impl eframe::App for HttpApp {
                 StyleBuilder::from_egui(ctx.style().as_ref())
                     .with_tab_bar_height(40.0)
                     .show_add_buttons(true)
+                    .expand_tabs(true)
                     .build(),
             )
             .show(
