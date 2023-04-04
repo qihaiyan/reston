@@ -1098,6 +1098,38 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
         if ui.button("Go").clicked() {
             trigger_fetch = true;
         }
+        let tooltip = "Click to copy the curl command";
+        if ui.button("curl").on_hover_text(tooltip).clicked() {
+            let mut curl = format!("curl '{}'", location.url);
+
+            if location.content_type == ContentType::FormUrlEncoded {
+                location
+                    .form_params
+                    .iter()
+                    .filter(|f| !f.0.is_empty() && !f.1.is_empty())
+                    .for_each(|h| {
+                        curl = format!("{} -d '{}={}'", curl, h.0, h.1);
+                    });
+            }
+
+            if location.method != Method::Get {
+                curl = format!("{} -X '{}'", curl, location.method.to_text());
+            }
+
+            location
+                .header
+                .iter()
+                .filter(|f| !f.0.is_empty() && !f.1.is_empty())
+                .for_each(|h| {
+                    curl = format!("{} -H '{}:{}'", curl, h.0, h.1);
+                });
+
+            if location.content_type == ContentType::Json && !location.body.is_empty() {
+                curl = format!("{} -H 'Content-Type: application/json' -d '{}'", curl, location.body);
+            }
+
+            ui.output_mut(|u| u.copied_text = curl);
+        }
     });
 
     trigger_fetch
@@ -1145,10 +1177,12 @@ fn ui_resource(ui: &mut egui::Ui, resource: &Option<Resource>) {
                 body = serde_json::to_string_pretty(&body1).unwrap();
                 let colored_text = syntax_highlighting(ui.ctx(), &body);
 
-                let tooltip = "Click to copy the response body";
-                if ui.button("📋").on_hover_text(tooltip).clicked() {
-                    ui.output_mut(|u| u.copied_text = body.clone());
-                }
+                ui.horizontal(|ui| {
+                    let tooltip = "Click to copy the response body";
+                    if ui.button("📋").on_hover_text(tooltip).clicked() {
+                        ui.output_mut(|u| u.copied_text = body.clone());
+                    }
+                });
                 ui.separator();
 
                 if let Some(colored_text) = colored_text {
