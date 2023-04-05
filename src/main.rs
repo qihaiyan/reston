@@ -1,30 +1,52 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> Result<(), eframe::Error> {
-    use eframe::{IconData, Theme};
-
+fn main() -> eframe::Result<()> {
     let icon_bytes = include_bytes!("../reston.png");
     let icon = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
     let (icon_width, icon_height) = icon.dimensions();
-    let options = eframe::NativeOptions {
-        drag_and_drop_support: true,
-        default_theme: Theme::Dark,
-        icon_data: Some(IconData {
+
+    let native_options = eframe::NativeOptions {
+        initial_window_size: Some([1200.0, 800.0].into()),
+        follow_system_theme: false,
+        default_theme: eframe::Theme::Dark,
+        icon_data: Some(eframe::IconData {
             rgba: icon.into_raw(),
             width: icon_width,
             height: icon_height,
         }),
+        #[cfg(target_os = "macos")]
+        fullsize_content: reston::FULLSIZE_CONTENT,
 
-        #[cfg(feature = "wgpu")]
-        renderer: eframe::Renderer::Wgpu,
+        // Maybe hide the OS-specific "chrome" around the window:
+        decorated: !reston::CUSTOM_WINDOW_DECORATIONS,
+        // To have rounded corners we need transparency:
+        transparent: reston::CUSTOM_WINDOW_DECORATIONS,
 
         ..Default::default()
     };
+
+    // let options = eframe::NativeOptions {
+    //     drag_and_drop_support: true,
+    //     default_theme: Theme::Dark,
+    //     icon_data: Some(IconData {
+    //         rgba: icon.into_raw(),
+    //         width: icon_width,
+    //         height: icon_height,
+    //     }),
+
+    //     #[cfg(feature = "wgpu")]
+    //     renderer: eframe::Renderer::Wgpu,
+
+    //     ..Default::default()
+    // };
     eframe::run_native(
         "Reston",
-        options,
-        Box::new(|_cc| Box::new(reston::HttpApp::new(_cc))),
+        native_options,
+        Box::new(|cc| {
+            let re_ui = reston::ReUi::load_and_apply(&cc.egui_ctx);
+            Box::new(reston::HttpApp::new(re_ui, cc.storage))
+        }),
     )
 }
 

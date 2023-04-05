@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::{syntax_highlighting, uri};
+use crate::{syntax_highlighting, uri, ReUi};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -700,9 +700,9 @@ impl Default for HttpApp {
 }
 
 impl HttpApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        setup_custom_fonts(&_cc.egui_ctx);
-        if let Some(storage) = _cc.storage {
+    pub fn new(re_ui: ReUi, storage: Option<&dyn eframe::Storage>) -> Self {
+        setup_custom_fonts(&re_ui.egui_ctx);
+        if let Some(storage) = storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
         Default::default()
@@ -1125,7 +1125,10 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
                 });
 
             if location.content_type == ContentType::Json && !location.body.is_empty() {
-                curl = format!("{} -H 'Content-Type: application/json' -d '{}'", curl, location.body);
+                curl = format!(
+                    "{} -H 'Content-Type: application/json' -d '{}'",
+                    curl, location.body
+                );
             }
 
             ui.output_mut(|u| u.copied_text = curl);
