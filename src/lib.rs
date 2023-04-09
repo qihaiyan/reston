@@ -113,7 +113,7 @@ impl ReUi {
     /// Height of the title row in the blueprint view and selection view,
     /// as well as the tab bar height in the viewport view.
     pub fn title_bar_height() -> f32 {
-        28.0 // from figma 2022-02-03
+        40.0 // from figma 2022-02-03
     }
 
     pub fn native_window_rounding() -> f32 {
@@ -588,16 +588,16 @@ impl ReUi {
 
 // ----------------------------------------------------------------------------
 
-#[cfg(feature = "egui_dock")]
 pub fn egui_dock_style(style: &egui::Style) -> egui_dock::Style {
     let mut dock_style = egui_dock::Style::from_egui(style);
     dock_style.separator_width = 2.0;
     dock_style.tab_bar_height = ReUi::title_bar_height();
     dock_style.default_inner_margin = 0.0.into();
-    dock_style.show_close_buttons = false;
-    dock_style.tab_include_scrollarea = false;
+    dock_style.show_close_buttons = true;
+    dock_style.tab_include_scrollarea = true;
     dock_style.show_context_menu = false;
-    dock_style.expand_tabs = false; // expand_tabs looks good, but decreases readability
+    dock_style.expand_tabs = true; // expand_tabs looks good, but decreases readability
+    dock_style.show_add_buttons = true;
 
     // Tabs can be "focused", meaning it was the last clicked (of any tab). We don't care about that.
     // Tabs can also be "active", meaning it is the selected tab within its sibling tabs. We want to highlight that.

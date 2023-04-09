@@ -3,7 +3,7 @@ use egui::collapsing_header::CollapsingState;
 use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
-use egui_dock::{DockArea, NodeIndex, StyleBuilder, TabViewer};
+use egui_dock::{DockArea, NodeIndex, TabViewer};
 use font_kit::{
     family_name::FamilyName,
     properties::{Properties, Weight},
@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::{syntax_highlighting, uri, ReUi};
+use crate::{egui_dock_style, syntax_highlighting, uri, ReUi};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -954,13 +954,14 @@ impl eframe::App for HttpApp {
 
         let mut added_nodes = Vec::new();
         DockArea::new(&mut self.tree)
-            .style(
-                StyleBuilder::from_egui(ctx.style().as_ref())
-                    .with_tab_bar_height(40.0)
-                    .show_add_buttons(true)
-                    .expand_tabs(true)
-                    .build(),
-            )
+            // .style(
+            //     StyleBuilder::from_egui(ctx.style().as_ref())
+            //         .with_tab_bar_height(40.0)
+            //         .show_add_buttons(true)
+            //         .expand_tabs(true)
+            //         .build(),
+            // )
+            .style(egui_dock_style(ctx.style().as_ref()))
             .show(
                 ctx,
                 &mut MyContext {
@@ -995,7 +996,8 @@ fn ui_url(ui: &mut egui::Ui, location: &mut Location) -> bool {
     ui.separator();
 
     ui.horizontal(|ui| {
-        egui::ComboBox::from_label("")
+        egui::ComboBox::from_id_source("http_method")
+            .width(80.0)
             .selected_text(format!("{:?}", location.method))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut location.method, Method::Get, "Get");
