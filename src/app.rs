@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::{egui_dock_style, syntax_highlighting, uri, ReUi};
+use crate::{egui_dock_style, icons, syntax_highlighting, uri, ReUi};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -639,6 +639,8 @@ impl TabViewer for MyContext<'_> {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct HttpApp {
+    #[serde(skip)]
+    re_ui: ReUi,
     darkmode: bool,
     directory: BTreeMap<String, Directory>,
     search: String,
@@ -667,6 +669,7 @@ impl Default for HttpApp {
     fn default() -> Self {
         let (sender, receiver) = mpsc::channel();
         Self {
+            re_ui: ReUi::load_and_apply(&Default::default()),
             darkmode: true,
             search: "".to_owned(),
             directory: BTreeMap::default(),
@@ -705,7 +708,17 @@ impl HttpApp {
         if let Some(storage) = storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
-        Default::default()
+
+        let mut http_app: HttpApp = Default::default();
+        http_app.re_ui = re_ui;
+        return http_app;
+    }
+    pub fn nested_menus(
+        ui: &mut egui::Ui,
+    ) {
+        if ui.button("Open...").clicked() {
+            ui.close_menu();
+        }
     }
 }
 
@@ -766,20 +779,25 @@ impl eframe::App for HttpApp {
                         //         self.darkmode = false;
                         //     }
                         // }
-                        ui.label("search:");
-                        ui.add(
-                            egui::TextEdit::singleline(&mut self.search)
-                                .desired_width(f32::INFINITY),
-                        );
                     });
                     ui.horizontal(|ui| {
-                        if ui.button("Add").clicked() {
+                        if self
+                            .re_ui
+                            .small_icon_button(ui, &icons::ADD)
+                            .on_hover_text("Add API Collection")
+                            .clicked()
+                        {
                             let mut dir_node = Directory::default();
                             dir_node.id = Uuid::new_v4().to_string();
                             dir_node.name = format!("new {}", self.directory.len());
                             self.directory.insert(dir_node.id.clone(), dir_node);
                         }
-                        if ui.button("Import").clicked() {
+                        if self
+                            .re_ui
+                            .small_icon_button(ui, &icons::SPACE_VIEW_TENSOR)
+                            .on_hover_text("Import API Collection From Postman")
+                            .clicked()
+                        {
                             if let Some(path) = rfd::FileDialog::new().pick_file() {
                                 let fpath = path.display().to_string();
                                 let fname = std::path::Path::new(&fpath);
@@ -831,6 +849,11 @@ impl eframe::App for HttpApp {
                                 }
                             }
                         }
+                        ui.label("search:");
+                        ui.add(
+                            egui::TextEdit::singleline(&mut self.search)
+                                .desired_width(f32::INFINITY),
+                        );
                     });
 
                     let mut dir_del = "".to_owned();
@@ -839,13 +862,13 @@ impl eframe::App for HttpApp {
                         ac.buffers
                             .iter()
                             .any(|d| x.1.locations.contains(&d.0) && d.1.url.contains(&self.search))
-                    })
-                    // .get(x.1.locations)
-                    // .unwrap()
-                    // .url
-                    // .contains(&self.search))
-                    {
+                    }) {
                         ui.horizontal(|ui| {
+                            self.re_ui.small_icon_button(ui, &icons::MENU);
+
+                            ui.menu_button("...", |ui| {
+                                Self::nested_menus(ui)
+                            });
                             if ui.button("add").clicked() {
                                 let id = Uuid::new_v4().to_string();
                                 let location: Location = Location {

@@ -79,3 +79,5 @@ pub const SPACE_VIEW_HISTOGRAM: Icon = Icon::new(
 );
 
 pub const CONTAINER: Icon = Icon::new("container", include_bytes!("../resource/icons/container.png"));
+
+pub const MENU: Icon = Icon::new("menu", include_bytes!("../resource/icons/menu.png"));

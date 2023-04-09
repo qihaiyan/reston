@@ -32,7 +32,7 @@ impl URI<'_> {
             + &self
                 .path
                 .as_ref()
-                .map_or_else(|| "".to_string(), |v| "/".to_string() + v.join("").as_str())
+                .map_or_else(|| "".to_string(), |v| "/".to_string() + v.join("/").as_str())
             + &self.query.clone().map_or_else(
                 || "".to_string(),
                 |v| {
@@ -77,7 +77,7 @@ impl Host {
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()
-                .join(","),
+                .join("."),
         }
     }
 }
