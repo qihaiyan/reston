@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::{egui_dock_style, icons, syntax_highlighting, uri, ReUi};
+use crate::{egui_dock_style, icons, syntax_highlighting, uri, Command, ReUi};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -663,6 +663,10 @@ pub struct HttpApp {
     preview: Option<Vec<Color>>,
     #[serde(skip)]
     run_state: Vec<RunState>,
+    #[serde(skip)]
+    pending_commands: Vec<Command>,
+    #[serde(skip)]
+    latest_cmd: String,
 }
 
 impl Default for HttpApp {
@@ -698,6 +702,8 @@ impl Default for HttpApp {
             ],
             preview: None,
             run_state: Default::default(),
+            pending_commands: Default::default(),
+            latest_cmd: Default::default(),
         }
     }
 }
@@ -713,9 +719,7 @@ impl HttpApp {
         http_app.re_ui = re_ui;
         return http_app;
     }
-    pub fn nested_menus(
-        ui: &mut egui::Ui,
-    ) {
+    pub fn nested_menus(ui: &mut egui::Ui) {
         if ui.button("Open...").clicked() {
             ui.close_menu();
         }
@@ -728,7 +732,7 @@ impl eframe::App for HttpApp {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         TopBottomPanel::bottom("http_bottom")
             .resizable(false)
             .show(ctx, |ui| {
@@ -864,35 +868,63 @@ impl eframe::App for HttpApp {
                             .any(|d| x.1.locations.contains(&d.0) && d.1.url.contains(&self.search))
                     }) {
                         ui.horizontal(|ui| {
-                            self.re_ui.small_icon_button(ui, &icons::MENU);
+                            // self.re_ui.small_icon_button(ui, &icons::MENU);
 
-                            ui.menu_button("...", |ui| {
-                                Self::nested_menus(ui)
-                            });
-                            if ui.button("add").clicked() {
-                                let id = Uuid::new_v4().to_string();
-                                let location: Location = Location {
-                                    id: id.clone(),
-                                    name: ("Item get".into()),
-                                    url: ("https://httpbin.org/get".into()),
-                                    params: (Vec::new()),
-                                    body: ("".into()),
-                                    header: (vec![("".to_owned(), "".to_owned())]),
-                                    content_type: ContentType::Json,
-                                    form_params: Vec::new(),
-                                    method: Method::Get,
-                                    response: Default::default(),
-                                };
-                                dir.1.locations.push(id.clone());
-                                self.api_collection.buffers.insert(id, location.clone());
-                            };
-                            if ui.button("del").clicked() {
-                                dir_del = dir.0.clone();
-                            };
-                            if ui.button("rename").clicked() {
-                                self.dir_rename = dir.0.clone();
-                                self.show_confirmation_dialog = true;
-                            };
+                            ui.menu_button("...", |ui| file_menu(ui, &mut self.pending_commands));
+                            let commands: Vec<Command> = self.pending_commands.drain(..).collect();
+                            for cmd in commands {
+                                match cmd {
+                                    Command::AddApi => {
+                                        let id = Uuid::new_v4().to_string();
+                                        let location: Location = Location {
+                                            id: id.clone(),
+                                            name: ("Item get".into()),
+                                            url: ("https://httpbin.org/get".into()),
+                                            params: (Vec::new()),
+                                            body: ("".into()),
+                                            header: (vec![("".to_owned(), "".to_owned())]),
+                                            content_type: ContentType::Json,
+                                            form_params: Vec::new(),
+                                            method: Method::Get,
+                                            response: Default::default(),
+                                        };
+                                        dir.1.locations.push(id.clone());
+                                        self.api_collection.buffers.insert(id, location.clone());
+                                    }
+                                    Command::DelApi => {
+                                        dir_del = dir.0.clone();
+                                    }
+                                    Command::RenameApi => {
+                                        self.dir_rename = dir.0.clone();
+                                        self.show_confirmation_dialog = true;
+                                    }
+                                }
+                            }
+
+                            // if ui.button("add").clicked() {
+                            //     let id = Uuid::new_v4().to_string();
+                            //     let location: Location = Location {
+                            //         id: id.clone(),
+                            //         name: ("Item get".into()),
+                            //         url: ("https://httpbin.org/get".into()),
+                            //         params: (Vec::new()),
+                            //         body: ("".into()),
+                            //         header: (vec![("".to_owned(), "".to_owned())]),
+                            //         content_type: ContentType::Json,
+                            //         form_params: Vec::new(),
+                            //         method: Method::Get,
+                            //         response: Default::default(),
+                            //     };
+                            //     dir.1.locations.push(id.clone());
+                            //     self.api_collection.buffers.insert(id, location.clone());
+                            // };
+                            // if ui.button("del").clicked() {
+                            //     dir_del = dir.0.clone();
+                            // };
+                            // if ui.button("rename").clicked() {
+                            //     self.dir_rename = dir.0.clone();
+                            //     self.show_confirmation_dialog = true;
+                            // };
                             ui.vertical(|ui| {
                                 let mut collapsing_state = CollapsingState::load_with_default_open(
                                     ui.ctx(),
@@ -1333,6 +1365,21 @@ fn setup_custom_fonts(ctx: &egui::Context) {
         .or_default()
         .insert(0, "mono".to_owned());
     ctx.set_fonts(fonts);
+}
+
+fn file_menu(ui: &mut egui::Ui, pending_commands: &mut Vec<Command>) {
+    Command::AddApi.menu_button_ui(ui, pending_commands);
+    Command::DelApi.menu_button_ui(ui, pending_commands);
+    Command::RenameApi.menu_button_ui(ui, pending_commands);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn save(app: &mut HttpApp) {
+    // let title = if loop_selection.is_some() {
+    //     "Save loop selection"
+    // } else {
+    //     "Save"
+    // };
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
