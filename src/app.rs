@@ -736,18 +736,18 @@ impl eframe::App for HttpApp {
         TopBottomPanel::bottom("http_bottom")
             .resizable(false)
             .show(ctx, |ui| {
-                vertex_gradient(
-                    ui,
-                    Default::default(),
-                    &Gradient(
-                        self.preview
-                            .as_ref()
-                            .unwrap_or(self.items.as_ref())
-                            .iter()
-                            .map(|c| c.color)
-                            .collect(),
-                    ),
-                );
+                // vertex_gradient(
+                //     ui,
+                //     Default::default(),
+                //     &Gradient(
+                //         self.preview
+                //             .as_ref()
+                //             .unwrap_or(self.items.as_ref())
+                //             .iter()
+                //             .map(|c| c.color)
+                //             .collect(),
+                //     ),
+                // );
 
                 let layout = egui::Layout::top_down(egui::Align::Center).with_main_justify(true);
                 ui.allocate_ui_with_layout(ui.available_size(), layout, |ui| {
@@ -1009,13 +1009,7 @@ impl eframe::App for HttpApp {
 
         let mut added_nodes = Vec::new();
         DockArea::new(&mut self.tree)
-            // .style(
-            //     StyleBuilder::from_egui(ctx.style().as_ref())
-            //         .with_tab_bar_height(40.0)
-            //         .show_add_buttons(true)
-            //         .expand_tabs(true)
-            //         .build(),
-            // )
+            .show_add_buttons(true)
             .style(egui_dock_style(ctx.style().as_ref()))
             .show(
                 ctx,

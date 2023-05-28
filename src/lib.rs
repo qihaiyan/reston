@@ -173,12 +173,12 @@ impl ReUi {
         egui::Vec2::splat(12.0)
     }
 
-    pub fn setup_table_header(_header: &mut egui_extras::TableRow<'_, '_>) {}
+    // pub fn setup_table_header(_header: &mut egui_extras::TableRow<'_, '_>) {}
 
-    pub fn setup_table_body(body: &mut egui_extras::TableBody<'_>) {
-        // Make sure buttons don't visually overflow:
-        body.ui_mut().spacing_mut().interact_size.y = Self::table_line_height();
-    }
+    // pub fn setup_table_body(body: &mut egui_extras::TableBody<'_>) {
+    //     // Make sure buttons don't visually overflow:
+    //     body.ui_mut().spacing_mut().interact_size.y = Self::table_line_height();
+    // }
 
     #[must_use]
     #[allow(clippy::unused_self)]
@@ -590,33 +590,14 @@ impl ReUi {
 
 pub fn egui_dock_style(style: &egui::Style) -> egui_dock::Style {
     let mut dock_style = egui_dock::Style::from_egui(style);
-    dock_style.separator_width = 2.0;
-    dock_style.tab_bar_height = ReUi::title_bar_height();
-    dock_style.default_inner_margin = 0.0.into();
-    dock_style.show_close_buttons = true;
-    dock_style.tab_include_scrollarea = true;
-    dock_style.show_context_menu = false;
-    dock_style.expand_tabs = true; // expand_tabs looks good, but decreases readability
-    dock_style.show_add_buttons = true;
+    dock_style.separator.width = 2.0;
+    dock_style.tab_bar.height = ReUi::title_bar_height();
+    dock_style.tab_bar.show_scroll_bar_on_overflow = true;
 
-    // Tabs can be "focused", meaning it was the last clicked (of any tab). We don't care about that.
-    // Tabs can also be "active", meaning it is the selected tab within its sibling tabs. We want to highlight that.
-    let inactive_text_color = style.visuals.widgets.noninteractive.text_color();
-    let active_text_color = style.visuals.widgets.active.text_color();
-
-    dock_style.tab_text_color_unfocused = inactive_text_color;
-    dock_style.tab_text_color_focused = inactive_text_color;
-    dock_style.tab_text_color_active_unfocused = active_text_color;
-    dock_style.tab_text_color_active_focused = active_text_color;
-
-    // Don't show tabs
-    dock_style.tab_bar_background_color = style.visuals.panel_fill;
-    dock_style.tab_background_color = style.visuals.panel_fill;
-
-    dock_style.hline_color = style.visuals.widgets.noninteractive.bg_stroke.color;
+    // dock_style.tabs.hline_color = style.visuals.widgets.noninteractive.bg_stroke.color;
 
     // The active tab has no special outline:
-    dock_style.tab_outline_color = Color32::TRANSPARENT;
+    dock_style.tabs.outline_color = Color32::TRANSPARENT;
 
     dock_style
 }
