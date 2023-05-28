@@ -313,29 +313,31 @@ impl TabViewer for MyContext<'_> {
                                 // }
                                 request.call().or_any_status()
                             }
-                            Method::Post => match resource_location.content_type {
-                                ContentType::Json => request
-                                    .set("Content-Type", "application/json")
-                                    .send_string(&resource_location.body)
-                                    .or_any_status(),
-                                ContentType::FormUrlEncoded => {
-                                    let params = resource_location
-                                        .params
-                                        .iter()
-                                        .filter(|e| (e.0.is_empty() == false));
-                                    for e in params {
-                                        request = request.query(&e.0, &e.1);
+                            Method::Post | Method::Put | Method::Patch | Method::Delete => {
+                                match resource_location.content_type {
+                                    ContentType::Json => request
+                                        .set("Content-Type", "application/json")
+                                        .send_string(&resource_location.body)
+                                        .or_any_status(),
+                                    ContentType::FormUrlEncoded => {
+                                        let params = resource_location
+                                            .params
+                                            .iter()
+                                            .filter(|e| (e.0.is_empty() == false));
+                                        for e in params {
+                                            request = request.query(&e.0, &e.1);
+                                        }
+                                        let from_param: Vec<(&str, &str)> = resource_location
+                                            .form_params
+                                            .as_slice()
+                                            .into_iter()
+                                            .map(|f| (f.0.as_str(), f.1.as_str()))
+                                            .collect();
+                                        request.send_form(&from_param[..]).or_any_status()
                                     }
-                                    let from_param: Vec<(&str, &str)> = resource_location
-                                        .form_params
-                                        .as_slice()
-                                        .into_iter()
-                                        .map(|f| (f.0.as_str(), f.1.as_str()))
-                                        .collect();
-                                    request.send_form(&from_param[..]).or_any_status()
+                                    _ => request.call().or_any_status(),
                                 }
-                                _ => request.call().or_any_status(),
-                            },
+                            }
                             _ => request.call().or_any_status(),
                         };
                         let stop = SystemTime::now()
