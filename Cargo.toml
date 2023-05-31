@@ -12,7 +12,7 @@ egui = { version = "0.22", features = ["color-hex"] }
 #eframe = { version = "0.21", features = ["dark-light", "persistence"] }
 eframe = { version = "0.22", features = ["persistence"] }
 egui_extras = { version = "0.22", features = ["svg"] }
-egui_dock = { version = "0.6", features = ["serde"] }
+egui_dock = { version = "0.6.1", features = ["serde"] }
 color-hex = "0.2"
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 serde_json = "1.0"
