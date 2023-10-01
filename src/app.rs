@@ -3,12 +3,13 @@ use egui::collapsing_header::CollapsingState;
 use egui::{
     lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
-use egui_dock::{DockArea, NodeIndex, TabViewer};
+use egui_dock::{DockArea, DockState, NodeIndex, SurfaceIndex, TabViewer};
 use font_kit::{
     family_name::FamilyName,
     properties::{Properties, Weight},
     source::SystemSource,
 };
+use material_icons::Icon;
 use serde_json::Value;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
@@ -18,7 +19,7 @@ use std::{collections::BTreeMap, io::Read, sync::mpsc, thread};
 use ureq::{OrAnyStatus, Response, Transport};
 use uuid::Uuid;
 
-use crate::{egui_dock_style, icons, syntax_highlighting, uri, Command, ReUi};
+use crate::{egui_dock_style, syntax_highlighting, uri, Command, ReUi};
 pub type Result<T> = std::result::Result<T, Transport>;
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -619,7 +620,7 @@ impl TabViewer for MyContext<'_> {
         egui::WidgetText::from(name)
     }
 
-    fn on_add(&mut self, _node: NodeIndex) {
+    fn on_add(&mut self, _: SurfaceIndex, _node: NodeIndex) {
         let id = Uuid::new_v4().to_string();
         let location: Location = Location {
             id: id.clone(),
@@ -646,7 +647,7 @@ pub struct HttpApp {
     darkmode: bool,
     directory: BTreeMap<String, Directory>,
     search: String,
-    tree: egui_dock::Tree<String>,
+    tree: DockState<String>,
     api_collection: ApiCollection,
     reqest_editor: RequestEditor,
     #[serde(skip)]
@@ -679,7 +680,7 @@ impl Default for HttpApp {
             darkmode: true,
             search: "".to_owned(),
             directory: BTreeMap::default(),
-            tree: Default::default(),
+            tree: DockState::new(vec![]),
             api_collection: Default::default(),
             reqest_editor: Default::default(),
             sender,
@@ -789,7 +790,7 @@ impl eframe::App for HttpApp {
                     ui.horizontal(|ui| {
                         if self
                             .re_ui
-                            .small_icon_button(ui, &icons::ADD)
+                            .small_icon_button(ui, &Icon::Rotation3d)
                             .on_hover_text("Add API Collection")
                             .clicked()
                         {
@@ -800,7 +801,7 @@ impl eframe::App for HttpApp {
                         }
                         if self
                             .re_ui
-                            .small_icon_button(ui, &icons::SPACE_VIEW_TENSOR)
+                            .small_icon_button(ui, &Icon::Rotation3d)
                             .on_hover_text("Import API Collection From Postman")
                             .clicked()
                         {
@@ -969,11 +970,17 @@ impl eframe::App for HttpApp {
                                                     .name
                                                     .clone();
                                                 if ui.selectable_label(is_open, name).clicked() {
-                                                    if let Some((node_index, tab_index)) =
-                                                        tab_location
+                                                    if let Some((
+                                                        surface_index,
+                                                        node_index,
+                                                        tab_index,
+                                                    )) = tab_location
                                                     {
-                                                        self.tree
-                                                            .set_active_tab(node_index, tab_index);
+                                                        self.tree.set_active_tab((
+                                                            surface_index,
+                                                            node_index,
+                                                            tab_index,
+                                                        ));
                                                     } else {
                                                         self.tree.push_to_focused_leaf(id.clone());
                                                     }
@@ -1326,6 +1333,22 @@ fn setup_custom_fonts(ctx: &egui::Context) {
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(0, "prop".to_owned());
+    fonts.font_data.insert(
+        "MaterialIcons-Regular".to_owned(),
+        egui::FontData::from_static(material_icons::FONT),
+    );
+    if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        vec.push("MaterialIcons-Regular".to_owned());
+    }
+
+    if let Some(vec) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+        vec.push("MaterialIcons-Regular".to_owned());
+    }
+    // fonts
+    //     .families
+    //     .entry(egui::FontFamily::Proportional)
+    //     .or_default()
+    //     .insert(0, "MaterialIcons-Regular".to_owned());
 
     let mono = if let Ok(font) = source.select_best_match(
         &[

@@ -83,8 +83,9 @@ impl Command {
         ui: &mut egui::Ui,
         pending_commands: &mut Vec<Command>,
     ) -> egui::Response {
-        let button = self.menu_button(ui.ctx());
-        let response = ui.add(button).on_hover_text(self.tooltip());
+        let button = egui::Button::new(self.text());
+        // let button = self.menu_button(ui.ctx());
+        let response = ui.add(button);
         if response.clicked() {
             pending_commands.push(self);
             ui.close_menu();

@@ -15,11 +15,13 @@ mod static_image_cache;
 pub mod toasts;
 mod toggle_switch;
 
+use material_icons::{Icon, icon_to_char};
+
 pub use command::Command;
 pub use command_palette::CommandPalette;
 pub use design_tokens::DesignTokens;
-pub use icons::Icon;
-pub use static_image_cache::StaticImageCache;
+// pub use icons::Icon;
+// pub use static_image_cache::StaticImageCache;
 pub use toggle_switch::toggle_switch;
 
 // ---------------------------------------------------------------------------
@@ -52,8 +54,6 @@ pub struct TopBarStyle {
 
 use std::sync::Arc;
 
-use parking_lot::Mutex;
-
 use egui::{pos2, Align2, Color32, Mesh, NumExt, Rect, Shape, Vec2};
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ pub struct ReUi {
     /// Colors, styles etc loaded from a design_tokens.json
     pub design_tokens: DesignTokens,
 
-    pub static_image_cache: Arc<Mutex<StaticImageCache>>,
+    // pub static_image_cache: Arc<Mutex<StaticImageCache>>,
 }
 
 impl ReUi {
@@ -72,7 +72,7 @@ impl ReUi {
         Self {
             egui_ctx: egui_ctx.clone(),
             design_tokens: DesignTokens::load_and_apply(egui_ctx),
-            static_image_cache: Arc::new(Mutex::new(StaticImageCache::default())),
+            // static_image_cache: Arc::new(Mutex::new(StaticImageCache::default())),
         }
     }
 
@@ -258,102 +258,104 @@ impl ReUi {
         TopBarStyle { height, indent }
     }
 
-    pub fn icon_image(&self, icon: &Icon) -> Arc<egui_extras::RetainedImage> {
-        self.static_image_cache.lock().get(icon.id, icon.png_bytes)
-    }
+    // pub fn icon_image(&self, icon: &Icon) -> egui::Image {
+    //     self.static_image_cache.lock().get(icon.id, icon.png_bytes)
+    // }
 
     pub fn small_icon_button(&self, ui: &mut egui::Ui, icon: &Icon) -> egui::Response {
-        let size_points = Self::small_icon_size();
-        let image = self.icon_image(icon);
-        let texture_id = image.texture_id(ui.ctx());
-        // TODO(emilk): change color and size on hover
-        let tint = ui.visuals().widgets.inactive.fg_stroke.color;
-        ui.add(egui::ImageButton::new(texture_id, size_points).tint(tint))
+        let icon_char = icon_to_char(icon.clone());
+        ui.add(egui::Button::new(String::from(icon_char)))
+        // let size_points = Self::small_icon_size();
+        // let image = self.icon_image(icon);
+        // // let texture_id = image.texture_id(ui.ctx());
+        // // TODO(emilk): change color and size on hover
+        // let tint = ui.visuals().widgets.inactive.fg_stroke.color;
+        // ui.add(egui::ImageButton::new(self.icon_image(icon)).tint(tint))
     }
 
-    pub fn medium_icon_toggle_button(
-        &self,
-        ui: &mut egui::Ui,
-        icon: &Icon,
-        selected: &mut bool,
-    ) -> egui::Response {
-        let size_points = egui::Vec2::splat(16.0); // TODO(emilk): get from design tokens
+    // pub fn medium_icon_toggle_button(
+    //     &self,
+    //     ui: &mut egui::Ui,
+    //     icon: &Icon,
+    //     selected: &mut bool,
+    // ) -> egui::Response {
+    //     let size_points = egui::Vec2::splat(16.0); // TODO(emilk): get from design tokens
 
-        let image = self.icon_image(icon);
-        let texture_id = image.texture_id(ui.ctx());
-        let tint = if *selected {
-            ui.visuals().widgets.inactive.fg_stroke.color
-        } else {
-            egui::Color32::from_gray(100) // TODO(emilk): get from design tokens
-        };
-        let mut response = ui.add(egui::ImageButton::new(texture_id, size_points).tint(tint));
-        if response.clicked() {
-            *selected = !*selected;
-            response.mark_changed();
-        }
-        response
-    }
+    //     let image = self.icon_image(icon);
+    //     let texture_id = image.texture_id(ui.ctx());
+    //     let tint = if *selected {
+    //         ui.visuals().widgets.inactive.fg_stroke.color
+    //     } else {
+    //         egui::Color32::from_gray(100) // TODO(emilk): get from design tokens
+    //     };
+    //     let mut response = ui.add(egui::ImageButton::new(texture_id, size_points).tint(tint));
+    //     if response.clicked() {
+    //         *selected = !*selected;
+    //         response.mark_changed();
+    //     }
+    //     response
+    // }
 
-    fn large_button_impl(
-        &self,
-        ui: &mut egui::Ui,
-        icon: &Icon,
-        bg_fill: Option<Color32>,
-        tint: Option<Color32>,
-    ) -> egui::Response {
-        let prev_style = ui.style().clone();
-        {
-            // For big buttons we have a background color even when inactive:
-            let visuals = ui.visuals_mut();
-            visuals.widgets.inactive.weak_bg_fill = visuals.widgets.inactive.bg_fill;
-        }
+    // fn large_button_impl(
+    //     &self,
+    //     ui: &mut egui::Ui,
+    //     icon: &Icon,
+    //     bg_fill: Option<Color32>,
+    //     tint: Option<Color32>,
+    // ) -> egui::Response {
+    //     let prev_style = ui.style().clone();
+    //     {
+    //         // For big buttons we have a background color even when inactive:
+    //         let visuals = ui.visuals_mut();
+    //         visuals.widgets.inactive.weak_bg_fill = visuals.widgets.inactive.bg_fill;
+    //     }
 
-        let image = self.icon_image(icon);
-        let texture_id = image.texture_id(ui.ctx());
+    //     let image = self.icon_image(icon);
+    //     let texture_id = image.texture_id(ui.ctx());
 
-        let button_size = Vec2::splat(28.0);
-        let icon_size = Vec2::splat(12.0); // centered inside the button
-        let rounding = 6.0;
+    //     let button_size = Vec2::splat(28.0);
+    //     let icon_size = Vec2::splat(12.0); // centered inside the button
+    //     let rounding = 6.0;
 
-        let (rect, response) = ui.allocate_exact_size(button_size, egui::Sense::click());
-        response.widget_info(|| egui::WidgetInfo::new(egui::WidgetType::ImageButton));
+    //     let (rect, response) = ui.allocate_exact_size(button_size, egui::Sense::click());
+    //     response.widget_info(|| egui::WidgetInfo::new(egui::WidgetType::ImageButton));
 
-        if ui.is_rect_visible(rect) {
-            let visuals = ui.style().interact(&response);
-            let bg_fill = bg_fill.unwrap_or(visuals.bg_fill);
-            let tint = tint.unwrap_or(visuals.fg_stroke.color);
+    //     if ui.is_rect_visible(rect) {
+    //         let visuals = ui.style().interact(&response);
+    //         let bg_fill = bg_fill.unwrap_or(visuals.bg_fill);
+    //         let tint = tint.unwrap_or(visuals.fg_stroke.color);
 
-            let image_rect = egui::Align2::CENTER_CENTER.align_size_within_rect(icon_size, rect);
-            // let image_rect = image_rect.expand2(expansion); // can make it blurry, so let's not
+    //         let image_rect = egui::Align2::CENTER_CENTER.align_size_within_rect(icon_size, rect);
+    //         // let image_rect = image_rect.expand2(expansion); // can make it blurry, so let's not
 
-            ui.painter()
-                .rect_filled(rect.expand(visuals.expansion), rounding, bg_fill);
+    //         ui.painter()
+    //             .rect_filled(rect.expand(visuals.expansion), rounding, bg_fill);
 
-            let mut mesh = egui::Mesh::with_texture(texture_id);
-            let uv = egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
-            mesh.add_rect_with_uv(image_rect, uv, tint);
-            ui.painter().add(egui::Shape::mesh(mesh));
-        }
+    //         let mut mesh = egui::Mesh::with_texture(texture_id);
+    //         let uv = egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+    //         mesh.add_rect_with_uv(image_rect, uv, tint);
+    //         ui.painter().add(egui::Shape::mesh(mesh));
+    //     }
 
-        ui.set_style(prev_style);
+    //     ui.set_style(prev_style);
 
-        response
-    }
+    //     response
+    // }
 
-    pub fn large_button(&self, ui: &mut egui::Ui, icon: &Icon) -> egui::Response {
-        self.large_button_impl(ui, icon, None, None)
-    }
+    // pub fn large_button(&self, ui: &mut egui::Ui, icon: &Icon) -> egui::Response {
+    //     self.large_button_impl(ui, icon, None, None)
+    // }
 
-    pub fn large_button_selected(
-        &self,
-        ui: &mut egui::Ui,
-        icon: &Icon,
-        selected: bool,
-    ) -> egui::Response {
-        let bg_fill = selected.then(|| ui.visuals().selection.bg_fill);
-        let tint = selected.then(|| ui.visuals().selection.stroke.color);
-        self.large_button_impl(ui, icon, bg_fill, tint)
-    }
+    // pub fn large_button_selected(
+    //     &self,
+    //     ui: &mut egui::Ui,
+    //     icon: &Icon,
+    //     selected: bool,
+    // ) -> egui::Response {
+    //     let bg_fill = selected.then(|| ui.visuals().selection.bg_fill);
+    //     let tint = selected.then(|| ui.visuals().selection.stroke.color);
+    //     self.large_button_impl(ui, icon, bg_fill, tint)
+    // }
 
     // pub fn visibility_toggle_button(
     //     &self,
@@ -510,80 +512,80 @@ impl ReUi {
         ui.painter().add(shadow);
     }
 
-    pub fn selectable_label_with_icon(
-        &self,
-        ui: &mut egui::Ui,
-        icon: &Icon,
-        text: impl Into<egui::WidgetText>,
-        selected: bool,
-    ) -> egui::Response {
-        let button_padding = ui.spacing().button_padding;
-        let total_extra = button_padding + button_padding;
+    // pub fn selectable_label_with_icon(
+    //     &self,
+    //     ui: &mut egui::Ui,
+    //     icon: &Icon,
+    //     text: impl Into<egui::WidgetText>,
+    //     selected: bool,
+    // ) -> egui::Response {
+    //     let button_padding = ui.spacing().button_padding;
+    //     let total_extra = button_padding + button_padding;
 
-        let wrap_width = ui.available_width() - total_extra.x;
-        let text = text
-            .into()
-            .into_galley(ui, None, wrap_width, egui::TextStyle::Button);
+    //     let wrap_width = ui.available_width() - total_extra.x;
+    //     let text = text
+    //         .into()
+    //         .into_galley(ui, None, wrap_width, egui::TextStyle::Button);
 
-        let text_to_icon_padding = 4.0;
-        let icon_width_plus_padding = Self::small_icon_size().x + text_to_icon_padding;
+    //     let text_to_icon_padding = 4.0;
+    //     let icon_width_plus_padding = Self::small_icon_size().x + text_to_icon_padding;
 
-        let mut desired_size = total_extra + text.size() + egui::vec2(icon_width_plus_padding, 0.0);
-        desired_size.y = desired_size
-            .y
-            .at_least(ui.spacing().interact_size.y)
-            .at_least(Self::small_icon_size().y);
-        let (rect, response) = ui.allocate_at_least(desired_size, egui::Sense::click());
-        response.widget_info(|| {
-            egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, selected, text.text())
-        });
+    //     let mut desired_size = total_extra + text.size() + egui::vec2(icon_width_plus_padding, 0.0);
+    //     desired_size.y = desired_size
+    //         .y
+    //         .at_least(ui.spacing().interact_size.y)
+    //         .at_least(Self::small_icon_size().y);
+    //     let (rect, response) = ui.allocate_at_least(desired_size, egui::Sense::click());
+    //     response.widget_info(|| {
+    //         egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, selected, text.text())
+    //     });
 
-        if ui.is_rect_visible(rect) {
-            let visuals = ui.style().interact_selectable(&response, selected);
+    //     if ui.is_rect_visible(rect) {
+    //         let visuals = ui.style().interact_selectable(&response, selected);
 
-            // Draw background on interaction.
-            if selected || response.hovered() || response.highlighted() || response.has_focus() {
-                let rect = rect.expand(visuals.expansion);
+    //         // Draw background on interaction.
+    //         if selected || response.hovered() || response.highlighted() || response.has_focus() {
+    //             let rect = rect.expand(visuals.expansion);
 
-                ui.painter().rect(
-                    rect,
-                    visuals.rounding,
-                    visuals.weak_bg_fill,
-                    visuals.bg_stroke,
-                );
-            }
+    //             ui.painter().rect(
+    //                 rect,
+    //                 visuals.rounding,
+    //                 visuals.weak_bg_fill,
+    //                 visuals.bg_stroke,
+    //             );
+    //         }
 
-            // Draw icon
-            let image = self.icon_image(icon);
-            let texture_id = image.texture_id(ui.ctx());
-            // TODO(emilk/andreas): change color and size on hover
-            let tint = ui.visuals().widgets.inactive.fg_stroke.color;
-            let image_rect = egui::Rect::from_min_size(
-                ui.painter().round_pos_to_pixels(egui::pos2(
-                    rect.min.x.ceil(),
-                    ((rect.min.y + rect.max.y - Self::small_icon_size().y) * 0.5).ceil(),
-                )),
-                Self::small_icon_size(),
-            );
-            ui.painter().image(
-                texture_id,
-                image_rect,
-                egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                tint,
-            );
+    //         // Draw icon
+    //         let image = self.icon_image(icon);
+    //         let texture_id = image.texture_id(ui.ctx());
+    //         // TODO(emilk/andreas): change color and size on hover
+    //         let tint = ui.visuals().widgets.inactive.fg_stroke.color;
+    //         let image_rect = egui::Rect::from_min_size(
+    //             ui.painter().round_pos_to_pixels(egui::pos2(
+    //                 rect.min.x.ceil(),
+    //                 ((rect.min.y + rect.max.y - Self::small_icon_size().y) * 0.5).ceil(),
+    //             )),
+    //             Self::small_icon_size(),
+    //         );
+    //         ui.painter().image(
+    //             texture_id,
+    //             image_rect,
+    //             egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+    //             tint,
+    //         );
 
-            // Draw text next to the icon.
-            let mut text_rect = rect;
-            text_rect.min.x = image_rect.max.x + text_to_icon_padding;
-            let text_pos = ui
-                .layout()
-                .align_size_within_rect(text.size(), text_rect)
-                .min;
-            text.paint_with_visuals(ui.painter(), text_pos, &visuals);
-        }
+    //         // Draw text next to the icon.
+    //         let mut text_rect = rect;
+    //         text_rect.min.x = image_rect.max.x + text_to_icon_padding;
+    //         let text_pos = ui
+    //             .layout()
+    //             .align_size_within_rect(text.size(), text_rect)
+    //             .min;
+    //         text.paint_with_visuals(ui.painter(), text_pos, &visuals);
+    //     }
 
-        response
-    }
+    //     response
+    // }
 }
 
 // ----------------------------------------------------------------------------
@@ -597,7 +599,7 @@ pub fn egui_dock_style(style: &egui::Style) -> egui_dock::Style {
     // dock_style.tabs.hline_color = style.visuals.widgets.noninteractive.bg_stroke.color;
 
     // The active tab has no special outline:
-    dock_style.tabs.outline_color = Color32::TRANSPARENT;
+    // dock_style.tabs.outline_color = Color32::TRANSPARENT;
 
     dock_style
 }

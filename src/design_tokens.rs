@@ -24,8 +24,9 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
     let apply_font = true;
     let apply_font_size = true;
 
-    let json: serde_json::Value = serde_json::from_str(include_str!("../resource/design_tokens.json"))
-        .expect("Failed to parse data/design_tokens.json");
+    let json: serde_json::Value =
+        serde_json::from_str(include_str!("../resource/design_tokens.json"))
+            .expect("Failed to parse data/design_tokens.json");
 
     let typography_default: Typography = get_alias(&json, "{Alias.Typography.Default.value}");
 
@@ -37,11 +38,20 @@ fn apply_design_tokens(ctx: &egui::Context) -> DesignTokens {
             "Inter-Medium".into(),
             egui::FontData::from_static(include_bytes!("../resource/Inter-Medium.otf")),
         );
+        font_definitions.font_data.insert(
+            "MaterialIcons-Regular".into(),
+            egui::FontData::from_static(include_bytes!("../resource/MaterialIcons-Regular.ttf")),
+        );
         font_definitions
             .families
             .get_mut(&egui::FontFamily::Proportional)
             .unwrap()
             .insert(0, "Inter-Medium".into());
+        font_definitions
+            .families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "MaterialIcons-Regular".into());
         ctx.set_fonts(font_definitions);
     }
 
