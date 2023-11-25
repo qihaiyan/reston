@@ -7,39 +7,20 @@ fn main() -> eframe::Result<()> {
     let (icon_width, icon_height) = icon.dimensions();
 
     let native_options = eframe::NativeOptions {
-        initial_window_size: Some([1200.0, 800.0].into()),
+        // initial_window_size: Some([1200.0, 800.0].into()),
         follow_system_theme: false,
         default_theme: eframe::Theme::Dark,
-        icon_data: Some(eframe::IconData {
+        viewport: egui::ViewportBuilder::default().with_icon(std::sync::Arc::new(egui::IconData {
             rgba: icon.into_raw(),
             width: icon_width,
             height: icon_height,
-        }),
+        })),
         #[cfg(target_os = "macos")]
         fullsize_content: reston::FULLSIZE_CONTENT,
-
-        // Maybe hide the OS-specific "chrome" around the window:
-        decorated: !reston::CUSTOM_WINDOW_DECORATIONS,
-        // To have rounded corners we need transparency:
-        transparent: reston::CUSTOM_WINDOW_DECORATIONS,
 
         ..Default::default()
     };
 
-    // let options = eframe::NativeOptions {
-    //     drag_and_drop_support: true,
-    //     default_theme: Theme::Dark,
-    //     icon_data: Some(IconData {
-    //         rgba: icon.into_raw(),
-    //         width: icon_width,
-    //         height: icon_height,
-    //     }),
-
-    //     #[cfg(feature = "wgpu")]
-    //     renderer: eframe::Renderer::Wgpu,
-
-    //     ..Default::default()
-    // };
     eframe::run_native(
         "Reston",
         native_options,
