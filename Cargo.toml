@@ -8,10 +8,10 @@ publish = false
 winres = "0.1"
 
 [dependencies]
-egui = { version = "0.24", features = ["color-hex"] }
+egui = { version = "0.24.1", features = ["color-hex"] }
 #eframe = { version = "0.21", features = ["dark-light", "persistence"] }
-eframe = { version = "0.24", features = ["persistence"] }
-egui_extras = { version = "0.24", features = ["svg"] }
+eframe = { version = "0.24.1", features = ["persistence"] }
+egui_extras = { version = "0.24.1", features = ["svg"] }
 egui_dock = { version = "0.9", features = ["serde"] }
 color-hex = "0.2"
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
