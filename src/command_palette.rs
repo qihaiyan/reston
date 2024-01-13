@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
-use egui::{Align2, Key, NumExt as _};
+use egui::{Align2, Color32, Key, NumExt as _};
 
-use crate::{Command};
+use crate::Command;
 
 #[derive(Default)]
 pub struct CommandPalette {
@@ -124,17 +124,16 @@ impl CommandPalette {
             let text = format_match(fuzzy_match, ui, &font_id, style.text_color());
 
             // TODO(emilk): shorten long text using '…'
-            let galley = text
-                .into_galley(
-                    ui,
-                    Some(false),
-                    f32::INFINITY,
-                    egui::FontSelection::default(),
-                )
-                .galley;
+            let galley = text.into_galley(
+                ui,
+                Some(false),
+                f32::INFINITY,
+                egui::FontSelection::default(),
+            );
             let text_rect = Align2::LEFT_CENTER
                 .anchor_rect(egui::Rect::from_min_size(rect.left_center(), galley.size()));
-            ui.painter().galley(text_rect.min, galley);
+            ui.painter()
+                .galley(text_rect.min, galley, Color32::PLACEHOLDER);
 
             ui.painter().text(
                 rect.right_center(),
