@@ -790,7 +790,7 @@ impl eframe::App for HttpApp {
                     ui.horizontal(|ui| {
                         if self
                             .re_ui
-                            .small_icon_button(ui, &Icon::Rotation3d)
+                            .small_icon_button(ui, &Icon::AddToQueue)
                             .on_hover_text("Add API Collection")
                             .clicked()
                         {
@@ -801,7 +801,7 @@ impl eframe::App for HttpApp {
                         }
                         if self
                             .re_ui
-                            .small_icon_button(ui, &Icon::Rotation3d)
+                            .small_icon_button(ui, &Icon::ImportExport)
                             .on_hover_text("Import API Collection From Postman")
                             .clicked()
                         {
