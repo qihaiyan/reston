@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui::collapsing_header::CollapsingState;
 use egui::{
-    lerp, style::Margin, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
+    lerp, Color32, Frame, ScrollArea, SidePanel, TopBottomPanel, Ui, WidgetText,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, SurfaceIndex, TabViewer};
 use font_kit::{
@@ -249,7 +249,7 @@ struct PostmanForm {
 
 #[derive(Clone)]
 struct Color {
-    color: Color32,
+    // color: Color32,
     name: String,
 }
 
@@ -277,7 +277,7 @@ impl TabViewer for MyContext<'_> {
 
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         Frame::none()
-            .inner_margin(Margin::same(10.0))
+            .inner_margin(egui::Margin::same(10.0))
             .show(ui, |ui| {
                 let mut add_location = false;
                 let location = self.api_collection.buffers.get_mut(tab).unwrap();
@@ -692,15 +692,15 @@ impl Default for HttpApp {
             items: vec![
                 Color {
                     name: "Panic Purple".to_string(),
-                    color: egui::hex_color!("642CA9"),
+                    // color: egui::hex_color!("642CA9"),
                 },
                 Color {
                     name: "Generic Green".to_string(),
-                    color: egui::hex_color!("2A9D8F"),
+                    // color: egui::hex_color!("2A9D8F"),
                 },
                 Color {
                     name: "Ownership Orange*".to_string(),
-                    color: egui::hex_color!("E9C46A"),
+                    // color: egui::hex_color!("E9C46A"),
                 },
             ],
             preview: None,
